@@ -244,9 +244,63 @@ void CommandInputController::commandHandler(string command) {
 
         }
         */
-        else
-        {
-            cout << "Unknown command: " << command << "\n";
+        else if (command == "report-util") {
+            auto allScreens = ScreenManager::getInstance()->getAllScreens();
+            vector<shared_ptr<Screen>> runningProcesses;
+            vector<shared_ptr<Screen>> finishedProcesses;
+
+            for (const auto& pair : allScreens) {
+                if (pair.first == "main") continue;
+                auto screen = pair.second;
+                if (screen->getProgramCounter() >= screen->getTotalInstructions() && screen->getTotalInstructions() > 0) {
+                    finishedProcesses.push_back(screen);
+                }
+                else {
+                    runningProcesses.push_back(screen);
+                }
+            }
+
+            // Sort by creation timestamp for FCFS ordering
+            sort(runningProcesses.begin(), runningProcesses.end(), [](const auto& a, const auto& b) { return a->getTimestamp() < b->getTimestamp(); });
+            sort(finishedProcesses.begin(), finishedProcesses.end(), [](const auto& a, const auto& b) { return a->getTimestamp() < b->getTimestamp(); });
+
+            ofstream logFile("csopesy-log.txt"); // Overwrite mode
+            if (!logFile) {
+                cout << "Failed to open report file.\n";
+                return;
+            }
+
+            logFile << "--------------------------------------------------------------------------------\n";
+            logFile << "Running processes:\n";
+            if (runningProcesses.empty()) {
+                logFile << " (None)\n";
+            }
+            else {
+                for (const auto& screen : runningProcesses) {
+                    logFile << left << setw(10) << screen->getName()
+                        << " (" << screen->getTimestamp() << ")";
+                    if (screen->getCoreID() != -1) {
+                        logFile << "\tCore: " << screen->getCoreID();
+                    }
+                    logFile << "\t" << screen->getProgramCounter() << " / " << screen->getTotalInstructions() << "\n";
+                }
+            }
+
+            logFile << "\nFinished processes:\n";
+            if (finishedProcesses.empty()) {
+                logFile << " (None)\n";
+            }
+            else {
+                for (const auto& screen : finishedProcesses) {
+                    logFile << left << setw(10) << screen->getName()
+                        << " (" << screen->getTimestampFinished() << ")"
+                        << "\tFinished"
+                        << "\t" << screen->getProgramCounter() << " / " << screen->getTotalInstructions() << "\n";
+                }
+            }
+            logFile << "--------------------------------------------------------------------------------\n";
+            logFile.close();
+            cout << "Screen list report saved to 'csopesy-log.txt'.\n";
         }
     }
     else { // We are inside a specific process screen
@@ -260,5 +314,6 @@ void CommandInputController::commandHandler(string command) {
         else {
             cout << "Unknown command '" << command << "'. Type 'exit' to return to the main console.\n";
         }
-    }
+    } 
+
 }
