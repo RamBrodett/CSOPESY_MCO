@@ -56,16 +56,24 @@ void ScreenManager::displayProcessSMI() {
     }
 
     Screen& screen = *screenPtr;
-    bool isFinished = screen.getProgramCounter() >= screen.getTotalInstructions();
+    bool isFinished = screen.isFinished();
 
-    cout << CLIController::COLOR_BLUE << "\n=== process-smi for " << screen.getName() << " ===\n" << CLIController::COLOR_RESET;
-    cout << "Status        : " << (screen.getIsRunning() ? "Running" : (isFinished ? "Finished" : "Waiting")) << "\n";
-    cout << "Assigned Core : " << (screen.getCoreID() != -1 ? to_string(screen.getCoreID()) : "N/A") << "\n";
-    // Use new functions: getProgramCounter() and getTotalInstructions()
-    cout << "Progress      : " << screen.getProgramCounter() << " / " << screen.getTotalInstructions() << "\n";
-    cout << "Created       : " << screen.getTimestamp() << "\n";
-    if (isFinished) {
-        cout << "Finished      : " << screen.getTimestampFinished() << "\n";
+    cout << "Process name: " << screen.getName() << endl;
+    cout << "Logs:" << endl;
+
+    // Use the getter to access logs safely
+    for (const auto& line : screen.getOutputBuffer()) {
+        cout << line << endl;
     }
-    cout << CLIController::COLOR_BLUE << "========================\n" << CLIController::COLOR_RESET;
+
+    cout << endl;
+    if (isFinished) {
+        cout << endl << "Finished!" << endl;
+    }
+    else {
+        cout << "Current instruction line: " << screen.getProgramCounter() << endl;
+        cout << "Lines of code: " << screen.getTotalInstructions() << endl;
+    }
+
+    
 }

@@ -31,6 +31,10 @@ string Screen::getTimestampFinished() const { return timestampFinished; }
 int Screen::getCoreID() const { return cpuCoreID; }
 bool Screen::getIsRunning() const { return isRunning; }
 bool Screen::isFinished() const { return programCounter >= getTotalInstructions(); }
+std::vector<std::string> Screen::getOutputBuffer() const {
+    std::lock_guard<std::mutex> lock(outputMutex);
+    return outputBuffer;
+}
 
 std::vector<std::string> Screen::flushOutputBuffer() {
     lock_guard<mutex> lock(outputMutex);

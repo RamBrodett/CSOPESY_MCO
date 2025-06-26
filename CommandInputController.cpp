@@ -33,15 +33,15 @@ CommandInputController* CommandInputController::getInstance() {
 void CommandInputController::handleInputEntry() {
     auto currentScreen = ScreenManager::getInstance()->getCurrentScreen();
 
-    // After every command, check for and print new output from the current process screen
-    if (currentScreen && currentScreen->getName() != "main") {
-        auto messages = currentScreen->flushOutputBuffer();
-        if (!messages.empty()) {
-            for (const auto& msg : messages) {
-                cout << CLIController::COLOR_BLUE << "[" << currentScreen->getName() << " output] " << msg << CLIController::COLOR_RESET << endl;
-            }
-        }
-    }
+    // REMOVE THIS BLOCK:
+    // if (currentScreen && currentScreen->getName() != "main") {
+    //     auto messages = currentScreen->flushOutputBuffer();
+    //     if (!messages.empty()) {
+    //         for (const auto& msg : messages) {
+    //             cout << CLIController::COLOR_BLUE << "[" << currentScreen->getName() << " output] " << msg << CLIController::COLOR_RESET << endl;
+    //         }
+    //     }
+    // }
 
     cout << CLIController::COLOR_GREEN << (currentScreen->getName() + " > ") << CLIController::COLOR_RESET;
     string command;

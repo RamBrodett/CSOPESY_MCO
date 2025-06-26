@@ -29,6 +29,7 @@ public:
     bool getIsRunning() const;
     std::vector<std::string> flushOutputBuffer();
     bool isFinished() const;
+    std::vector<std::string> getOutputBuffer() const;
 
     // --- Setters ---
     void setName(std::string name);
@@ -58,6 +59,6 @@ private:
     bool isRunning;
 
     std::unordered_map<std::string, uint16_t> variables;
+    mutable std::mutex outputMutex;
     std::vector<std::string> outputBuffer;
-    std::mutex outputMutex;
 };
