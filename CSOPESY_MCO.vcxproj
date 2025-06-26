@@ -37,7 +37,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CLIController.cpp" />
-    <ClCompile Include="CommandInputContorller.cpp" />
+    <ClCompile Include="CommandInputController.cpp" />
     <ClCompile Include="Kernel.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Scheduler.cpp" />

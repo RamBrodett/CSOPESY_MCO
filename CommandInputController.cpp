@@ -233,20 +233,6 @@ void CommandInputController::commandHandler(string command) {
             }
             cout << "Scheduler stopped successfully." << endl;
         }
-        /*
-         else if (command == "report-util") {
-            ofstream reportFile("csopesy-log.txt", ios::app);
-            if (!reportFile) {
-                cout << "Failed to open report file.\n";
-                return;
-            }
-            reportFile << "Report generated at: " << CLIController::getInstance()->getTimestamp() << "\n";
-            reportFile.close();
-			cout << "Report saved to 'csopesy-log.txt'.\n";
-
-
-        }
-        */
         else if (command == "report-util") {
             auto allScreens = ScreenManager::getInstance()->getAllScreens();
             vector<shared_ptr<Screen>> runningProcesses;
