@@ -48,6 +48,8 @@ public:
 	void setAlgorithm(const string& algo);
 	string getAlgorithm() const;
 
+	int getDelayPerExec() const;
+
 
 private:
 	thread processGeneratorThread;
@@ -61,6 +63,7 @@ private:
 
 	int quantumCycles = 1;
 	int batchProcessFreq = 1;
+    int lastGenCycle = 0;
 	int minInstructions = 1;
 	int maxInstructions = 1;
 	int delayPerExec = 0;

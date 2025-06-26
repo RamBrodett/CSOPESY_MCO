@@ -202,62 +202,7 @@ void CommandInputController::commandHandler(string command) {
                 cout << "Scheduler is already running.\n";
             }
             else {
-                cout << "Creating 10 processes with randomized instructions...\n";
-                random_device rd;
-                mt19937 gen(rd());
-                uniform_int_distribution<> instrDist(5, 15); // Number of instructions per process
-                uniform_int_distribution<> typeDist(0, 2);   // 0: PRINT, 1: SLEEP, 2: FOR
-                uniform_int_distribution<> sleepDist(50, 300);
-                uniform_int_distribution<> forCountDist(2, 5);
-                uniform_int_distribution<> forDepthDist(1, 3);
-
-                auto makePrint = [](const std::string& procName) {
-                    return Instruction{ InstructionType::PRINT, {}, "Hello world from " + procName + "!" };
-                    };
-                auto makeSleep = [&]() {
-                    Operand sleepOp{ false, "", static_cast<uint16_t>(sleepDist(gen)) };
-                    return Instruction{ InstructionType::SLEEP, {sleepOp}, "" };
-                    };
-
-                // Recursive function to generate random instructions, including nested FORs
-                function<vector<Instruction>(const string&, int)> genInstructions;
-                genInstructions = [&](const std::string& procName, int depth) -> std::vector<Instruction> {
-                    vector<Instruction> result;
-                    int numInstr = instrDist(gen);
-                    for (int i = 0; i < numInstr; ++i) {
-                        int t = (depth < 3) ? typeDist(gen) : typeDist(gen) % 2; // Only PRINT/SLEEP at max depth
-                        if (t == 0) {
-                            result.push_back(makePrint(procName));
-                        }
-                        else if (t == 1) {
-                            result.push_back(makeSleep());
-                        }
-                        else if (t == 2 && depth < 3) {
-                            Operand forCountOp{ false, "", static_cast<uint16_t>(forCountDist(gen)) };
-                            Instruction forInstr{ InstructionType::FOR, {forCountOp}, "" };
-                            
-                            // Recursively generate body
-                            vector<Instruction> body = genInstructions(procName, depth + 1);
-                            
-                            // Insert FOR, then body, then ENDFOR
-                            result.push_back(forInstr);
-                            result.insert(result.end(), body.begin(), body.end());
-                            result.push_back(Instruction{ InstructionType::ENDFOR, {}, "" });
-                        }
-                    }
-                    return result;
-                    };
-
-                for (int i = 0; i < 10; ++i) {
-                    string screenName = "proc" + to_string(i);
-                    vector<Instruction> instructions = genInstructions(screenName, 0);
-                    auto newScreen = make_shared<Screen>(screenName, instructions, CLIController::getInstance()->getTimestamp());
-                    ScreenManager::getInstance()->registerScreen(screenName, newScreen);
-                    Scheduler::getInstance()->addProcessToQueue(newScreen);
-                    this_thread::sleep_for(chrono::milliseconds(100));
-                }
-
-                cout << "Starting scheduler...\n";
+                cout << "Starting scheduler and dummy process generator...\n";
                 Kernel::getInstance()->getSchedulerThread() = thread([]() {
                     Scheduler::getInstance()->start();
                     });

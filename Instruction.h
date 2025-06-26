@@ -25,4 +25,5 @@ struct Instruction {
     InstructionType type;
     std::vector<Operand> operands;
     std::string printMessage;
+    std::vector<Instruction> innerInstructions;
 };
