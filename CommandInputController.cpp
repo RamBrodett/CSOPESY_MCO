@@ -72,8 +72,11 @@ void CommandInputController::commandHandler(string command) {
         }
         else if (command == "exit") {
             cout << "Exiting program...\n";
-            if (Scheduler::getInstance()->getSchedulerRunning()) {
-                Scheduler::getInstance()->stop();
+            //get scheduler instance
+            auto scheduler = Scheduler::getInstance();
+            //check if scheduler is nullpointer
+            if (scheduler && scheduler->getSchedulerRunning()) {
+                scheduler->stop();
                 if (Kernel::getInstance()->getSchedulerThread().joinable()) {
                     Kernel::getInstance()->getSchedulerThread().join();
                 }
@@ -272,20 +275,6 @@ void CommandInputController::commandHandler(string command) {
             }
             cout << "Scheduler stopped successfully." << endl;
         }
-        /*
-         else if (command == "report-util") {
-            ofstream reportFile("csopesy-log.txt", ios::app);
-            if (!reportFile) {
-                cout << "Failed to open report file.\n";
-                return;
-            }
-            reportFile << "Report generated at: " << CLIController::getInstance()->getTimestamp() << "\n";
-            reportFile.close();
-			cout << "Report saved to 'csopesy-log.txt'.\n";
-
-
-        }
-        */
         else if (command == "report-util") {
             auto allScreens = ScreenManager::getInstance()->getAllScreens();
             vector<shared_ptr<Screen>> runningProcesses;

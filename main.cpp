@@ -27,7 +27,10 @@ int main() {
 	}
 
 	cout << "Main loop exited. Shutting down scheduler..." << std::endl;
-	Scheduler::getInstance()->stop();
+	auto scheduler = Scheduler::getInstance();
+	if (scheduler) {
+		scheduler->stop();
+	}
 	if (Kernel::getInstance()->getSchedulerThread().joinable()) {
 		Kernel::getInstance()->getSchedulerThread().join();
 	}
