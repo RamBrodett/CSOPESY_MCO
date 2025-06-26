@@ -5,12 +5,14 @@
 #include <cstdint>
 #include <variant>
 
-enum class InstructionType {
-    PRINT,
-    DECLARE,
-    ADD,
-    SUBTRACT,
-    SLEEP,
+enum class InstructionType {  
+    PRINT,  
+    DECLARE,  
+    ADD,  
+    SUBTRACT,  
+    SLEEP,  
+    FOR, 
+    ENDFOR 
 };
 
 struct Operand {
