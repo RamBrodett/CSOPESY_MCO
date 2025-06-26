@@ -70,8 +70,11 @@ void CommandInputController::commandHandler(string command) {
         }
         else if (command == "exit") {
             cout << "Exiting program...\n";
-            if (Scheduler::getInstance()->getSchedulerRunning()) {
-                Scheduler::getInstance()->stop();
+            //get scheduler instance
+            auto scheduler = Scheduler::getInstance();
+            //check if scheduler is nullpointer
+            if (scheduler && scheduler->getSchedulerRunning()) {
+                scheduler->stop();
                 if (Kernel::getInstance()->getSchedulerThread().joinable()) {
                     Kernel::getInstance()->getSchedulerThread().join();
                 }
