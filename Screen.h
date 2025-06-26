@@ -47,6 +47,7 @@ private:
     uint16_t getOperandValue(const Operand& op);
     void setVariableValue(const std::string& name, uint16_t value);
     void addOutput(const std::string& message);
+    void executeInstructionList(const std::vector<Instruction>& instructionList);
 
     // --- Member variables reordered to fix warnings ---
     std::string name;

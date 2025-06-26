@@ -80,7 +80,7 @@ void Scheduler::start() {
                             addProcessToQueue(process);
                         }
                     }
-                    else { // FCFS
+                    else { //default fcfs
                         process->execute();
                     }
                 }
@@ -135,32 +135,32 @@ void Scheduler::generateDummyProcesses() {
     function<void(int, vector<Instruction>&, int&, int)> generateForInstruction;
     generateForInstruction = [&](int nestLevel, vector<Instruction>& instructions, int& currentCount, int maxCount) {
         if (currentCount >= maxCount) return;
+
+        // Ensure there's enough space for the FOR instruction itself and at least one inner instruction.
+        if (currentCount + 2 > maxCount) return;
+
         int repeats = value_dist(gen) % 4 + 2; // 2-5 repeats
         int innerCount = value_dist(gen) % 3 + 2; // 2-4 inner instructions
         vector<Instruction> innerInstructions;
-        for (int j = 0; j < innerCount && currentCount < maxCount; ++j) {
+
+        int tempInstructionCount = 0; // Use a temporary counter for inner instructions
+
+        for (int j = 0; j < innerCount && (currentCount + tempInstructionCount < maxCount); ++j) {
             if (nestLevel < 3 && value_dist(gen) % 4 == 0) {
-                generateForInstruction(nestLevel + 1, innerInstructions, currentCount, maxCount);
-            } else {
-                if (currentCount < maxCount) {
-                    innerInstructions.push_back(generateRandomInstruction("FOR"));
-                    currentCount++;
-                }
+                // Pass innerInstructions to the recursive call
+                generateForInstruction(nestLevel + 1, innerInstructions, tempInstructionCount, innerCount);
+            }
+            else {
+                innerInstructions.push_back(generateRandomInstruction("FOR"));
+                tempInstructionCount++;
             }
         }
-        // add FOR instruction itself (if space)
-        if (currentCount < maxCount) {
+
+        // Only add the FOR instruction if it contains inner instructions
+        if (!innerInstructions.empty()) {
             Instruction forInstr = { InstructionType::FOR, {{false, "", (uint16_t)repeats}}, "", innerInstructions };
-			
-            // expand FOR loop, but check for maxCount
-            for (int r = 0; r < repeats && currentCount < maxCount; ++r) {
-                for (const auto& innerInstr : innerInstructions) {
-                    if (currentCount < maxCount) {
-                        instructions.push_back(innerInstr);
-                        currentCount++;
-                    }
-                }
-            }
+            instructions.push_back(forInstr); // Add the single, nested FOR instruction
+            currentCount += tempInstructionCount + 1; // Update the main counter
         }
     };
 
@@ -185,8 +185,16 @@ void Scheduler::generateDummyProcesses() {
         return instructions;
     };
 
-	// initial dummy process generation
-    {
+//// initial dummy process generation
+ //   {
+ //       auto screenName = "p" + to_string(batch++);
+ //       auto instructions = generateProcess(screenName);
+ //       auto screen = make_shared<Screen>(screenName, instructions, CLIController::getInstance()->getTimestamp());
+ //       ScreenManager::getInstance()->registerScreen(screenName, screen);
+ //       addProcessToQueue(screen);
+ //   }
+    int initialBatchSize = numCores; //start with batch equal number to cores
+    for (int i = 0; i < initialBatchSize; ++i) {
         auto screenName = "p" + to_string(batch++);
         auto instructions = generateProcess(screenName);
         auto screen = make_shared<Screen>(screenName, instructions, CLIController::getInstance()->getTimestamp());

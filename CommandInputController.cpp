@@ -33,16 +33,6 @@ CommandInputController* CommandInputController::getInstance() {
 void CommandInputController::handleInputEntry() {
     auto currentScreen = ScreenManager::getInstance()->getCurrentScreen();
 
-    // REMOVE THIS BLOCK:
-    // if (currentScreen && currentScreen->getName() != "main") {
-    //     auto messages = currentScreen->flushOutputBuffer();
-    //     if (!messages.empty()) {
-    //         for (const auto& msg : messages) {
-    //             cout << CLIController::COLOR_BLUE << "[" << currentScreen->getName() << " output] " << msg << CLIController::COLOR_RESET << endl;
-    //         }
-    //     }
-    // }
-
     cout << CLIController::COLOR_GREEN << (currentScreen->getName() + " > ") << CLIController::COLOR_RESET;
     string command;
     if (!cin) {
@@ -277,13 +267,25 @@ void CommandInputController::commandHandler(string command) {
             logFile << "--------------------------------------------------------------------------------\n";
             logFile.close();
             cout << "Screen list report saved to 'csopesy-log.txt'.\n";
+		}
+        else {
+            cout << "Unknown command '" << command << "'. Type 'help' for available commands.\n";
         }
     }
     else { // We are inside a specific process screen
         if (command == "exit") {
             ScreenManager::getInstance()->switchScreen("main");
             CLIController::getInstance()->clearScreen();
-        }
+		}
+		else if (command == "clear") {
+			CLIController::getInstance()->clearScreen();
+		}
+		else if (command == "help") {
+			cout << "Available commands:\n";
+			cout << "exit                : Return to main console\n";
+			cout << "clear               : Clear the screen\n";
+			cout << "process-smi         : Display process SMI (State, Memory, and I/O)\n";
+		}
         else if (command == "process-smi") {
             ScreenManager::getInstance()->displayProcessSMI();
         }

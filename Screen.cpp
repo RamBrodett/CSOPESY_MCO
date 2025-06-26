@@ -7,10 +7,9 @@
 #include <mutex>
 #include <chrono>
 #include <numeric>
+#include <stack>
 #include "Scheduler.h"
-
 using namespace std;
-
 // Corrected Constructor to match header declaration order
 Screen::Screen(string name, std::vector<Instruction> instructions, string timestamp)
     : name(name), instructions(instructions), timestamp(timestamp), programCounter(0),
@@ -74,68 +73,98 @@ void Screen::setVariableValue(const std::string& name, uint16_t value) {
     variables[name] = value;
 }
 
-void Screen::execute(int quantum) {  
-    if (isFinished()) return;  
+void Screen::executeInstructionList(const std::vector<Instruction>& instructionList) {
+    for (const auto& instruction : instructionList) {
+        // --- Busy-wait delay ---
+        int delay = Scheduler::getInstance()->getDelayPerExec();
+        if (delay > 0) {
+            for (volatile int d = 0; d < delay; ++d) { /* busy-wait */ }
+        }
 
-    setIsRunning(true);  
-
-    int instructionsToExecute = (quantum == -1) ? getTotalInstructions() : quantum;  
-
-    for (int i = 0; i < instructionsToExecute && !isFinished(); ++i) {  
-        const auto& instruction = instructions[programCounter];  
-        switch (instruction.type) {  
-        case InstructionType::DECLARE:  
-            setVariableValue(instruction.operands[0].variableName, getOperandValue(instruction.operands[1]));  
-            break;  
-        case InstructionType::ADD:  
-            setVariableValue(instruction.operands[0].variableName, getOperandValue(instruction.operands[1]) + getOperandValue(instruction.operands[2]));  
-            break;  
-        case InstructionType::SUBTRACT:  
-            setVariableValue(instruction.operands[0].variableName, getOperandValue(instruction.operands[1]) - getOperandValue(instruction.operands[2]));  
-            break;  
-        case InstructionType::PRINT: {  
-            string output = instruction.printMessage;  
-            if (!instruction.operands.empty() && instruction.operands[0].isVariable) {  
-                const auto& varName = instruction.operands[0].variableName;  
-                string placeholder = "%" + varName + "%";  
-                size_t pos = output.find(placeholder);  
-                if (pos != string::npos) {  
-                    output.replace(pos, placeholder.length(), to_string(getOperandValue(instruction.operands[0])));  
-                }  
-            }  
-            //Format the log line before adding it to the buffer  
-            string timestamp = CLIController::getInstance()->getTimestamp();  
-            string formattedLog = "(" + timestamp + ") Core:" + to_string(cpuCoreID) + " \"" + output + "\"";  
-            addOutput(formattedLog);  
-            break;  
-        }  
-        case InstructionType::SLEEP:  
-            this_thread::sleep_for(chrono::milliseconds(getOperandValue(instruction.operands[0])));  
-            break;  
-        }  
-        programCounter++;  
-
-        int delay = Scheduler::getInstance()->getDelayPerExec();  
-        for (int d = 0; d < delay; ++d) {  
-            // busy-wait (do nothing)  
-        }  
-    }  
-
-    if (isFinished()) {  
-        setTimestampFinished(CLIController::getInstance()->getTimestamp());  
-        setIsRunning(false);  
-
-        ////write output to a file when process finishes with the new format  
-        //ofstream outFile(name + ".txt");  
-        //if (outFile.is_open()) {  
-        //    outFile << "Process name: " << name << endl;  
-        //    outFile << "Logs:" << endl;  
-
-        //    lock_guard<mutex> lock(outputMutex);  
-        //    for (const auto& line : outputBuffer) {  
-        //        outFile << line << endl;  
-        //    }  
-        //    outFile.close();  
-        //}  
-    }  
+        switch (instruction.type) {
+            // Note: No 'programCounter++' here, as this is for inner loops
+        case InstructionType::DECLARE:
+            setVariableValue(instruction.operands[0].variableName, getOperandValue(instruction.operands[1]));
+            break;
+        case InstructionType::ADD:
+            setVariableValue(instruction.operands[0].variableName, getOperandValue(instruction.operands[1]) + getOperandValue(instruction.operands[2]));
+            break;
+        case InstructionType::SUBTRACT:
+            setVariableValue(instruction.operands[0].variableName, getOperandValue(instruction.operands[1]) - getOperandValue(instruction.operands[2]));
+            break;
+        case InstructionType::PRINT: {
+            string output = instruction.printMessage;
+            if (!instruction.operands.empty() && instruction.operands[0].isVariable) {
+                const auto& varName = instruction.operands[0].variableName;
+                string placeholder = "%" + varName + "%";
+                size_t pos = output.find(placeholder);
+                if (pos != string::npos) {
+                    output.replace(pos, placeholder.length(), to_string(getOperandValue(instruction.operands[0])));
+                }
+            }
+            string timestamp = CLIController::getInstance()->getTimestamp();
+            string formattedLog = "(" + timestamp + ") Core:" + to_string(cpuCoreID) + " \"" + output + "\"";
+            addOutput(formattedLog);
+            break;
+        }
+        case InstructionType::SLEEP:
+            this_thread::sleep_for(chrono::milliseconds(getOperandValue(instruction.operands[0])));
+            break;
+        case InstructionType::FOR: {
+            uint16_t repeats = getOperandValue(instruction.operands[0]);
+            for (uint16_t i = 0; i < repeats; ++i) {
+                // Recursive call to handle nested loops
+                executeInstructionList(instruction.innerInstructions);
+            }
+            break;
+        }
+        }
+    }
 }
+
+
+void Screen::execute(int quantum) {
+    if (isFinished()) return;
+    setIsRunning(true);
+
+    // Determine how many top-level instructions to run
+    int instructionsToExecute = (quantum == -1) ? (getTotalInstructions() - programCounter) : quantum;
+
+    for (int i = 0; i < instructionsToExecute && !isFinished(); ++i) {
+        const auto& instruction = instructions[programCounter];
+
+        // --- Busy-wait delay ---
+        int delay = Scheduler::getInstance()->getDelayPerExec();
+        if (delay > 0) {
+            for (volatile int d = 0; d < delay; ++d) { /* busy-wait */ }
+        }
+
+        switch (instruction.type) {
+            // Cases for top-level instructions
+        case InstructionType::DECLARE:
+        case InstructionType::ADD:
+        case InstructionType::SUBTRACT:
+        case InstructionType::PRINT:
+        case InstructionType::SLEEP:
+            // For simple instructions, just execute them using the helper
+            executeInstructionList({ instruction });
+            break;
+
+        case InstructionType::FOR: {
+            uint16_t repeats = getOperandValue(instruction.operands[0]);
+            for (uint16_t j = 0; j < repeats; ++j) {
+                // Call the helper to execute the inner instructions
+                executeInstructionList(instruction.innerInstructions);
+            }
+            break;
+        }
+        }
+        // This is the crucial step that was failing before
+        programCounter++;
+    }
+
+    if (isFinished()) {
+        setTimestampFinished(CLIController::getInstance()->getTimestamp());
+        setIsRunning(false);
+    }
+};
