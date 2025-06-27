@@ -73,6 +73,7 @@ void Scheduler::start() {
                 }
 
                 if (process) {
+                    coresUsed++; //increase if being used
                     process->setCoreID(i);
                     if (algorithm == "rr") {
                         process->execute(quantumCycles);
@@ -83,6 +84,7 @@ void Scheduler::start() {
                     else { //default fcfs
                         process->execute();
                     }
+                    coresUsed--; //decerement if finished
                 }
                 cpuCycles++;
             }
@@ -134,7 +136,7 @@ void Scheduler::generateDummyProcesses() {
     // helper: generate a FOR loop with nested instructions (max 3)
     function<void(int, vector<Instruction>&, int&, int)> generateForInstruction;
     generateForInstruction = [&](int nestLevel, vector<Instruction>& instructions, int& currentCount, int maxCount) {
-        if (currentCount >= maxCount) return;
+        if (currentCount >= maxCount || nestLevel > 3) return;//maximum of 3 nest levels only
 
         // Ensure there's enough space for the FOR instruction itself and at least one inner instruction.
         if (currentCount + 2 > maxCount) return;
@@ -185,14 +187,6 @@ void Scheduler::generateDummyProcesses() {
         return instructions;
     };
 
-//// initial dummy process generation
- //   {
- //       auto screenName = "p" + to_string(batch++);
- //       auto instructions = generateProcess(screenName);
- //       auto screen = make_shared<Screen>(screenName, instructions, CLIController::getInstance()->getTimestamp());
- //       ScreenManager::getInstance()->registerScreen(screenName, screen);
- //       addProcessToQueue(screen);
- //   }
     int initialBatchSize = numCores; //start with batch equal number to cores
     for (int i = 0; i < initialBatchSize; ++i) {
         auto screenName = "p" + to_string(batch++);
@@ -219,6 +213,20 @@ void Scheduler::generateDummyProcesses() {
 
 void Scheduler::loadConfig() {
     ifstream config("config.txt");
+    //error checker
+    if (!config) {
+        cerr << "Error: config.txt not found. Using default values." << endl;
+        numCores = 4;
+        algorithm = "rr";
+        quantumCycles = 5;
+        batchProcessFreq = 1;
+        minInstructions = 1000;
+        maxInstructions = 2000;
+        delayPerExec = 0;
+        coresAvailable = numCores;
+        return;
+    }
+
     string key, value;
 
     while (config >> key >> std::ws) {
@@ -264,6 +272,8 @@ void Scheduler::loadConfig() {
             if (delayPerExec < 0) delayPerExec = 0;
         }
     }
+    //assign cores available
+    coresAvailable = numCores;
 }
 
 int Scheduler::getUsedCores() const { return coresUsed; }
