@@ -140,26 +140,26 @@ void Screen::execute(int quantum) {
         }
 
         switch (instruction.type) {
-            // Cases for top-level instructions
+
         case InstructionType::DECLARE:
         case InstructionType::ADD:
         case InstructionType::SUBTRACT:
         case InstructionType::PRINT:
         case InstructionType::SLEEP:
-            // For simple instructions, just execute them using the helper
+            //for simple instructions, just execute them using the helper
             executeInstructionList({ instruction });
             break;
 
         case InstructionType::FOR: {
             uint16_t repeats = getOperandValue(instruction.operands[0]);
             for (uint16_t j = 0; j < repeats; ++j) {
-                // Call the helper to execute the inner instructions
+                //call the helper to execute the inner instructions
                 executeInstructionList(instruction.innerInstructions);
             }
             break;
         }
         }
-        // This is the crucial step that was failing before
+     
         programCounter++;
     }
 

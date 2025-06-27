@@ -15,19 +15,19 @@ public:
         RUNNING,
         FINISHED
     };
-
+    // -- Contructors --
     Screen(std::string name, std::vector<Instruction> instructions, std::string timestamp);
     Screen();
 
     // --- Getters ---
     std::string getName() const;
     int getProgramCounter() const;
-    int getTotalInstructions() const;
+    int getTotalInstructions() const; //casted from size_t to int
     std::string getTimestamp() const;
     std::string getTimestampFinished() const;
     int getCoreID() const;
     bool getIsRunning() const;
-    std::vector<std::string> flushOutputBuffer();
+    std::vector<std::string> flushOutputBuffer(); //clears and returns output
     bool isFinished() const;
     std::vector<std::string> getOutputBuffer() const;
 
@@ -39,8 +39,8 @@ public:
     void setTimestamp(const std::string& ts);
     void setCoreID(int coreID);
     void setIsRunning(bool running);
-
-    void execute(int quantum = -1); // -1 for full execution
+    //if -1, then it is not round robin
+    void execute(int quantum = -1); 
 
 private:
     // Helper methods
@@ -49,17 +49,17 @@ private:
     void addOutput(const std::string& message);
     void executeInstructionList(const std::vector<Instruction>& instructionList);
 
-    // --- Member variables reordered to fix warnings ---
+    // --- Member variables ---
     std::string name;
     std::vector<Instruction> instructions;
     std::string timestamp;
 
-    int programCounter;
+    int programCounter; //index of instruction
     int cpuCoreID;
     std::string timestampFinished;
-    bool isRunning;
+    bool isRunning; 
 
-    std::unordered_map<std::string, uint16_t> variables;
-    mutable std::mutex outputMutex;
-    std::vector<std::string> outputBuffer;
+    std::unordered_map<std::string, uint16_t> variables; //memory storage for the process's variables
+    mutable std::mutex outputMutex; //protect concurrent access to the outputBUffer
+    std::vector<std::string> outputBuffer; //buffer to store log messages from PRINT
 };

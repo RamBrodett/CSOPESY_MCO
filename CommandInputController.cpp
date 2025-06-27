@@ -112,7 +112,7 @@ void CommandInputController::commandHandler(string command) {
                     }
                 }
 
-                // MODIFIED: Sort by creation timestamp for FCFS ordering
+                //sort by creation timestamp
                 sort(runningProcesses.begin(), runningProcesses.end(), [](const auto& a, const auto& b) { return a->getTimestamp() < b->getTimestamp(); });
                 sort(finishedProcesses.begin(), finishedProcesses.end(), [](const auto& a, const auto& b) { return a->getTimestamp() < b->getTimestamp(); });
 
@@ -238,11 +238,11 @@ void CommandInputController::commandHandler(string command) {
                 }
             }
 
-            // Sort by creation timestamp for FCFS ordering
+            //sort by creation timestamp for FCFS ordering
             sort(runningProcesses.begin(), runningProcesses.end(), [](const auto& a, const auto& b) { return a->getTimestamp() < b->getTimestamp(); });
             sort(finishedProcesses.begin(), finishedProcesses.end(), [](const auto& a, const auto& b) { return a->getTimestamp() < b->getTimestamp(); });
 
-            ofstream logFile("csopesy-log.txt"); // Overwrite mode
+            ofstream logFile("csopesy-log.txt"); //overwrite text
             if (!logFile) {
                 cout << "Failed to open report file.\n";
                 return;
@@ -286,7 +286,7 @@ void CommandInputController::commandHandler(string command) {
             cout << "Unknown command '" << command << "'. Type 'help' for available commands.\n";
         }
     }
-    else { // We are inside a specific process screen
+    else { //if inside a specific process screen
         if (command == "exit") {
             ScreenManager::getInstance()->switchScreen("main");
             CLIController::getInstance()->clearScreen();

@@ -14,7 +14,7 @@ using namespace std;
 CLIController* CLIController::instance = nullptr;
 
 CLIController::CLIController() {};
-
+//define colors
 const string CLIController::COLOR_GREEN = "\033[38;2;180;180;180m";
 const string CLIController::COLOR_RED = "\033[38;2;240;128;128m";
 const string CLIController::COLOR_BLUE = "\033[38;5;37m";
@@ -29,7 +29,7 @@ CLIController* CLIController::getInstance() {
 }
 
 string CLIController::getTimestamp() const {  
-    // Lock the mutex to ensure exclusive access to localtime  
+    //lock mutex for time
     std::lock_guard<std::mutex> lock(timestampMutex);  
 
     time_t now = time(0);  

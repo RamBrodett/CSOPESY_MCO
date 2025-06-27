@@ -116,7 +116,7 @@ void Scheduler::generateDummyProcesses() {
     uniform_int_distribution<> value_dist(1, 100);
     uniform_int_distribution<> type_dist(0, 4);
 
-	// helper: generate a random instruction (excluding FOR)
+	//generate a random instruction (excluding FOR)
     auto generateRandomInstruction = [&](const string& screenName) -> Instruction {
         InstructionType type = static_cast<InstructionType>(type_dist(gen));
         switch (type) {
@@ -133,23 +133,23 @@ void Scheduler::generateDummyProcesses() {
         }
     };
 
-    // helper: generate a FOR loop with nested instructions (max 3)
+    //generate a FOR loop with nested instructions-(max 3)
     function<void(int, vector<Instruction>&, int&, int)> generateForInstruction;
     generateForInstruction = [&](int nestLevel, vector<Instruction>& instructions, int& currentCount, int maxCount) {
         if (currentCount >= maxCount || nestLevel > 3) return;//maximum of 3 nest levels only
 
-        // Ensure there's enough space for the FOR instruction itself and at least one inner instruction.
+        //ensure there's enough space for the FOR instruction itself and at least one inner instruction.
         if (currentCount + 2 > maxCount) return;
 
         int repeats = value_dist(gen) % 4 + 2; // 2-5 repeats
         int innerCount = value_dist(gen) % 3 + 2; // 2-4 inner instructions
         vector<Instruction> innerInstructions;
 
-        int tempInstructionCount = 0; // Use a temporary counter for inner instructions
+        int tempInstructionCount = 0; //use a temporary counter for inner instructions
 
         for (int j = 0; j < innerCount && (currentCount + tempInstructionCount < maxCount); ++j) {
             if (nestLevel < 3 && value_dist(gen) % 4 == 0) {
-                // Pass innerInstructions to the recursive call
+                //pass innerInstructions to the recursive call
                 generateForInstruction(nestLevel + 1, innerInstructions, tempInstructionCount, innerCount);
             }
             else {
@@ -158,15 +158,15 @@ void Scheduler::generateDummyProcesses() {
             }
         }
 
-        // Only add the FOR instruction if it contains inner instructions
+        //only add the FOR instruction if it contains inner instructions
         if (!innerInstructions.empty()) {
             Instruction forInstr = { InstructionType::FOR, {{false, "", (uint16_t)repeats}}, "", innerInstructions };
-            instructions.push_back(forInstr); // Add the single, nested FOR instruction
-            currentCount += tempInstructionCount + 1; // Update the main counter
+            instructions.push_back(forInstr); //add it
+            currentCount += tempInstructionCount + 1; //update main counter
         }
     };
 
-	// helper: generate a process with random instructions
+	//generate a process with random instructions
     auto generateProcess = [&](const string& screenName) {
         vector<Instruction> instructions;
         int num_instructions = instr_dist(gen);
