@@ -26,4 +26,4 @@ The main function is located in `main.cpp`.
 ### Important Notes
 
 * Ensure the `config.txt` file is in the same directory as the executable.
-* The program requires a C++11 compliant compiler or later.
+* The program requires a C++17 compliant compiler or later.
