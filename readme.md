@@ -16,7 +16,7 @@
     * After successful compilation, an executable file named `os_emulator` will be created.
     * Run the executable from your terminal:
         ```bash
-        ./os_emulator
+        .\os_emulator
         ```
 
 ### Entry Class File
