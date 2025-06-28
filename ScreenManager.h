@@ -9,6 +9,7 @@
 class ScreenManager {
 public:
 	ScreenManager();
+	// --- Screen Management ---
 	void registerScreen(const std::string& name, std::shared_ptr<Screen> screen);
 	void switchScreen(const std::string& name);
 	std::shared_ptr<Screen> getCurrentScreen();
@@ -17,6 +18,7 @@ public:
 	std::shared_ptr<Screen> getScreen(const std::string& name);
 	void displayProcessSMI();
 
+	// --- Singleton ---
 	static void initialize();
 	static ScreenManager* getInstance();
 	static void destroy();
@@ -26,7 +28,7 @@ public:
 
 
 private:
-	static ScreenManager* instance;
+	static ScreenManager* instance; // single instance of screen manager
 	std::unordered_map<std::string, std::shared_ptr<Screen>> screens;
 	std::unordered_map<std::string, std::vector<std::string>> processLogs;
 	std::shared_ptr<Screen> currentScreen;

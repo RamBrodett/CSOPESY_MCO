@@ -33,16 +33,6 @@ CommandInputController* CommandInputController::getInstance() {
 void CommandInputController::handleInputEntry() {
     auto currentScreen = ScreenManager::getInstance()->getCurrentScreen();
 
-    // REMOVE THIS BLOCK:
-    // if (currentScreen && currentScreen->getName() != "main") {
-    //     auto messages = currentScreen->flushOutputBuffer();
-    //     if (!messages.empty()) {
-    //         for (const auto& msg : messages) {
-    //             cout << CLIController::COLOR_BLUE << "[" << currentScreen->getName() << " output] " << msg << CLIController::COLOR_RESET << endl;
-    //         }
-    //     }
-    // }
-
     cout << CLIController::COLOR_GREEN << (currentScreen->getName() + " > ") << CLIController::COLOR_RESET;
     string command;
     if (!cin) {
@@ -122,10 +112,13 @@ void CommandInputController::commandHandler(string command) {
                     }
                 }
 
-                // MODIFIED: Sort by creation timestamp for FCFS ordering
+                //sort by creation timestamp
                 sort(runningProcesses.begin(), runningProcesses.end(), [](const auto& a, const auto& b) { return a->getTimestamp() < b->getTimestamp(); });
                 sort(finishedProcesses.begin(), finishedProcesses.end(), [](const auto& a, const auto& b) { return a->getTimestamp() < b->getTimestamp(); });
 
+                cout << "CPU utilization: " << (Scheduler::getInstance()->getUsedCores() * 100 / Scheduler::getInstance()->getAvailableCores()) << "%" << endl;
+                cout << "Cores used: " << Scheduler::getInstance()->getUsedCores() << endl;
+                cout << "Cores available: " << Scheduler::getInstance()->getAvailableCores() << endl;
 
                 cout << "--------------------------------------------------------------------------------\n";
                 cout << "Running processes:\n";
@@ -189,8 +182,17 @@ void CommandInputController::commandHandler(string command) {
                     cout << "No such screen named '" << screenName << "'.\n";
                 }
                 else {
-                    ScreenManager::getInstance()->switchScreen(screenName);
-                    CLIController::getInstance()->clearScreen();
+					auto screen = ScreenManager::getInstance()->getScreen(screenName);
+					if (screen->isFinished()) {
+                        //check process if finished
+						cout << "Screen '" << screenName << "' has already finished execution.\n";
+					}
+					else {
+                        //change screen if not finished
+                        ScreenManager::getInstance()->switchScreen(screenName);
+                        CLIController::getInstance()->clearScreen();
+					}
+
                 }
             }
             else {
@@ -236,16 +238,18 @@ void CommandInputController::commandHandler(string command) {
                 }
             }
 
-            // Sort by creation timestamp for FCFS ordering
+            //sort by creation timestamp for FCFS ordering
             sort(runningProcesses.begin(), runningProcesses.end(), [](const auto& a, const auto& b) { return a->getTimestamp() < b->getTimestamp(); });
             sort(finishedProcesses.begin(), finishedProcesses.end(), [](const auto& a, const auto& b) { return a->getTimestamp() < b->getTimestamp(); });
 
-            ofstream logFile("csopesy-log.txt"); // Overwrite mode
+            ofstream logFile("csopesy-log.txt"); //overwrite text
             if (!logFile) {
                 cout << "Failed to open report file.\n";
                 return;
             }
-
+            logFile << "CPU utilization: " << (Scheduler::getInstance()->getUsedCores() * 100 / Scheduler::getInstance()->getAvailableCores()) << "%" << endl;
+            logFile << "Cores used: " << Scheduler::getInstance()->getUsedCores() << endl;
+            logFile << "Cores available: " << Scheduler::getInstance()->getAvailableCores() << endl;
             logFile << "--------------------------------------------------------------------------------\n";
             logFile << "Running processes:\n";
             if (runningProcesses.empty()) {
@@ -277,13 +281,25 @@ void CommandInputController::commandHandler(string command) {
             logFile << "--------------------------------------------------------------------------------\n";
             logFile.close();
             cout << "Screen list report saved to 'csopesy-log.txt'.\n";
+		}
+        else {
+            cout << "Unknown command '" << command << "'. Type 'help' for available commands.\n";
         }
     }
-    else { // We are inside a specific process screen
+    else { //if inside a specific process screen
         if (command == "exit") {
             ScreenManager::getInstance()->switchScreen("main");
             CLIController::getInstance()->clearScreen();
-        }
+		}
+		else if (command == "clear") {
+			CLIController::getInstance()->clearScreen();
+		}
+		else if (command == "help") {
+			cout << "Available commands:\n";
+			cout << "exit                : Return to main console\n";
+			cout << "clear               : Clear the screen\n";
+			cout << "process-smi         : Display process SMI (State, Memory, and I/O)\n";
+		}
         else if (command == "process-smi") {
             ScreenManager::getInstance()->displayProcessSMI();
         }

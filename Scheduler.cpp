@@ -73,6 +73,7 @@ void Scheduler::start() {
                 }
 
                 if (process) {
+                    coresUsed++; //increase if being used
                     process->setCoreID(i);
                     if (algorithm == "rr") {
                         process->execute(quantumCycles);
@@ -80,9 +81,10 @@ void Scheduler::start() {
                             addProcessToQueue(process);
                         }
                     }
-                    else { // FCFS
+                    else { //default fcfs
                         process->execute();
                     }
+                    coresUsed--; //decerement if finished
                 }
                 cpuCycles++;
             }
@@ -114,7 +116,7 @@ void Scheduler::generateDummyProcesses() {
     uniform_int_distribution<> value_dist(1, 100);
     uniform_int_distribution<> type_dist(0, 4);
 
-	// helper: generate a random instruction (excluding FOR)
+	//generate a random instruction (excluding FOR)
     auto generateRandomInstruction = [&](const string& screenName) -> Instruction {
         InstructionType type = static_cast<InstructionType>(type_dist(gen));
         switch (type) {
@@ -131,40 +133,40 @@ void Scheduler::generateDummyProcesses() {
         }
     };
 
-    // helper: generate a FOR loop with nested instructions (max 3)
+    //generate a FOR loop with nested instructions-(max 3)
     function<void(int, vector<Instruction>&, int&, int)> generateForInstruction;
     generateForInstruction = [&](int nestLevel, vector<Instruction>& instructions, int& currentCount, int maxCount) {
-        if (currentCount >= maxCount) return;
+        if (currentCount >= maxCount || nestLevel > 3) return;//maximum of 3 nest levels only
+
+        //ensure there's enough space for the FOR instruction itself and at least one inner instruction.
+        if (currentCount + 2 > maxCount) return;
+
         int repeats = value_dist(gen) % 4 + 2; // 2-5 repeats
         int innerCount = value_dist(gen) % 3 + 2; // 2-4 inner instructions
         vector<Instruction> innerInstructions;
-        for (int j = 0; j < innerCount && currentCount < maxCount; ++j) {
+
+        int tempInstructionCount = 0; //use a temporary counter for inner instructions
+
+        for (int j = 0; j < innerCount && (currentCount + tempInstructionCount < maxCount); ++j) {
             if (nestLevel < 3 && value_dist(gen) % 4 == 0) {
-                generateForInstruction(nestLevel + 1, innerInstructions, currentCount, maxCount);
-            } else {
-                if (currentCount < maxCount) {
-                    innerInstructions.push_back(generateRandomInstruction("FOR"));
-                    currentCount++;
-                }
+                //pass innerInstructions to the recursive call
+                generateForInstruction(nestLevel + 1, innerInstructions, tempInstructionCount, innerCount);
+            }
+            else {
+                innerInstructions.push_back(generateRandomInstruction("FOR"));
+                tempInstructionCount++;
             }
         }
-        // add FOR instruction itself (if space)
-        if (currentCount < maxCount) {
+
+        //only add the FOR instruction if it contains inner instructions
+        if (!innerInstructions.empty()) {
             Instruction forInstr = { InstructionType::FOR, {{false, "", (uint16_t)repeats}}, "", innerInstructions };
-			
-            // expand FOR loop, but check for maxCount
-            for (int r = 0; r < repeats && currentCount < maxCount; ++r) {
-                for (const auto& innerInstr : innerInstructions) {
-                    if (currentCount < maxCount) {
-                        instructions.push_back(innerInstr);
-                        currentCount++;
-                    }
-                }
-            }
+            instructions.push_back(forInstr); //add it
+            currentCount += tempInstructionCount + 1; //update main counter
         }
     };
 
-	// helper: generate a process with random instructions
+	//generate a process with random instructions
     auto generateProcess = [&](const string& screenName) {
         vector<Instruction> instructions;
         int num_instructions = instr_dist(gen);
@@ -185,8 +187,8 @@ void Scheduler::generateDummyProcesses() {
         return instructions;
     };
 
-	// initial dummy process generation
-    {
+    int initialBatchSize = numCores; //start with batch equal number to cores
+    for (int i = 0; i < initialBatchSize; ++i) {
         auto screenName = "p" + to_string(batch++);
         auto instructions = generateProcess(screenName);
         auto screen = make_shared<Screen>(screenName, instructions, CLIController::getInstance()->getTimestamp());
@@ -211,6 +213,20 @@ void Scheduler::generateDummyProcesses() {
 
 void Scheduler::loadConfig() {
     ifstream config("config.txt");
+    //error checker
+    if (!config) {
+        cerr << "Error: config.txt not found. Using default values." << endl;
+        numCores = 4;
+        algorithm = "rr";
+        quantumCycles = 5;
+        batchProcessFreq = 1;
+        minInstructions = 1000;
+        maxInstructions = 2000;
+        delayPerExec = 0;
+        coresAvailable = numCores;
+        return;
+    }
+
     string key, value;
 
     while (config >> key >> std::ws) {
@@ -256,6 +272,8 @@ void Scheduler::loadConfig() {
             if (delayPerExec < 0) delayPerExec = 0;
         }
     }
+    //assign cores available
+    coresAvailable = numCores;
 }
 
 int Scheduler::getUsedCores() const { return coresUsed; }
