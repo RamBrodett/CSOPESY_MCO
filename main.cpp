@@ -5,6 +5,7 @@
 #include "Scheduler.h"
 #include "Screen.h"
 #include "Instruction.h" 
+#include "MemoryManager.h"
 #include <memory>
 #include <iostream>
 #include <vector> 
@@ -39,6 +40,7 @@ int main() {
 	CommandInputController::destroy();
 	CLIController::destroy();
 	ScreenManager::destroy();
+	MemoryManager::destroy();
 	Kernel::destroy();
 	return 0;
 }

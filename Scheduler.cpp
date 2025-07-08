@@ -2,6 +2,7 @@
 #include "ScreenManager.h"
 #include "CLIController.h"
 #include "Instruction.h"
+#include "MemoryManager.h"
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -50,6 +51,7 @@ void Scheduler::start() {
     if (schedulerRunning) return;
     schedulerRunning.store(true);
 
+    MemoryManager::initialize(maxOverallMem);
     workerThreads.clear();
 
     processGeneratorThread = thread(&Scheduler::generateDummyProcesses, this);
@@ -73,7 +75,7 @@ void Scheduler::start() {
                 }
 
                 if (process) {
-                    coresUsed++; //increase if being used
+                    /*coresUsed++; //increase if being used
                     process->setCoreID(i);
                     if (algorithm == "rr") {
                         process->execute(quantumCycles);
@@ -84,7 +86,33 @@ void Scheduler::start() {
                     else { //default fcfs
                         process->execute();
                     }
-                    coresUsed--; //decerement if finished
+                    coresUsed--; //decerement if finished*/
+
+                    if (MemoryManager::getInstance()->allocate(process->getName(), memPerProc)) {
+                        coresUsed++;
+                        process->setCoreID(i);
+                   
+                        if (algorithm == "rr") {
+                            process->execute(quantumCycles);
+                            if (cpuCycles % quantumCycles == 0) {
+                               MemoryManager::getInstance()->printMemoryLayout(cpuCycles); 
+                            }
+                            if (!process->isFinished()) {
+                               addProcessToQueue(process);  
+                            }
+                            else {
+                                MemoryManager::getInstance()->deallocate(process->getName());
+                            }
+                        }
+                        else { 
+                            process->execute(); 
+                            MemoryManager::getInstance()->deallocate(process->getName()); // Deallocate when finished
+                        }
+                         coresUsed--;
+                    }
+                    else { // Not enough memory
+                        addProcessToQueue(process); // Re-queue the process
+                    }
                 }
                 cpuCycles++;
             }
@@ -216,13 +244,13 @@ void Scheduler::loadConfig() {
     //error checker
     if (!config) {
         cerr << "Error: config.txt not found. Using default values." << endl;
-        numCores = 4;
+        numCores = 2;
         algorithm = "rr";
-        quantumCycles = 5;
+        quantumCycles = 4;
         batchProcessFreq = 1;
-        minInstructions = 1000;
-        maxInstructions = 2000;
-        delayPerExec = 0;
+        minInstructions = 100;
+        maxInstructions = 100;
+        delayPerExec = 1;
         coresAvailable = numCores;
         return;
     }
@@ -271,6 +299,17 @@ void Scheduler::loadConfig() {
             delayPerExec = stoi(value);
             if (delayPerExec < 0) delayPerExec = 0;
         }
+        else if (key == "max-overall-mem") {
+            maxOverallMem = stoi(value);
+            
+        }
+        else if (key == "mem-per-frame") {
+            memPerFrame = stoi(value);
+            
+        }
+        else if (key == "mem-per-proc") {
+            memPerProc = stoi(value);
+        }
     }
     //assign cores available
     coresAvailable = numCores;
@@ -283,5 +322,6 @@ int Scheduler::getCpuCycles() const { return cpuCycles; }
 void Scheduler::setCpuCycles(int cycles) { cpuCycles = cycles; }
 int Scheduler::getDelayPerExec() const { return delayPerExec; }
 
+int Scheduler::getMemPerProc() const { return memPerProc; }
 bool Scheduler::getSchedulerRunning() const { return schedulerRunning.load(); }
 void Scheduler::setSchedulerRunning(bool val) { schedulerRunning.store(val); }

@@ -6,6 +6,7 @@
 #include <thread>
 #include <memory>
 #include <atomic>
+#include "MemoryManager.h"
 #include "Screen.h"
 #include <vector>
 using namespace std;
@@ -50,6 +51,9 @@ public:
 	void setAlgorithm(const string& algo);
 	string getAlgorithm() const;
 
+	// --- Memory Config ---
+	int getMemPerProc() const;
+
 
 
 private:
@@ -61,6 +65,9 @@ private:
 	int minInstructions = 1;
 	int maxInstructions = 1;
 	int delayPerExec = 0;
+	int maxOverallMem = 16384;
+	int memPerFrame = 16;
+	int memPerProc = 4096;
 
 	// --- Metrics ---
 	int coresUsed = 0;
