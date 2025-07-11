@@ -15,6 +15,7 @@ public:
     // --- Configuration State ---
     void setConfigInitialized(bool status);
     bool isConfigInitialized() const;
+	~Kernel(); // Destructor to clean up resources
 
 private:
     Kernel();

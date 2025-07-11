@@ -140,3 +140,13 @@ void MemoryManager::printMemoryLayout(int cycle) const {
     outFile << "---start--- = 0" << std::endl;
     outFile.close();
 }
+
+bool MemoryManager::isAllocated(const std::string& processId) const {
+    std::lock_guard<std::mutex> lock(mapMutex_);
+    for (const auto& block : memoryMap) {
+        if (block.processId == processId) {
+            return true;
+        }
+    }
+    return false;
+}

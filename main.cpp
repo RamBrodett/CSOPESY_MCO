@@ -24,7 +24,26 @@ int main() {
 	CLIController::getInstance()->clearScreen();
 
 	while (Kernel::getInstance()->getRunningStatus()) {
+		auto scheduler = Scheduler::getInstance();
+		if (scheduler && scheduler->getSchedulerRunning()) {
+			// Increment the cycle on every loop
+			scheduler->incrementCpuCycles();
+
+			// Check for memory reporting on every cycle tick
+			if (scheduler->getAlgorithm() == "rr") {
+				int currentCycles = scheduler->getCpuCycles();
+				int quantum = scheduler->getQuantumCycles(); // You'll need to add a getter for this
+				if (quantum > 0 && currentCycles > 0 && currentCycles % quantum == 0) {
+					//cout << "DEBUG: Main loop printing memory layout at cycle " << currentCycles << endl;
+					MemoryManager::getInstance()->printMemoryLayout(currentCycles);
+				}
+			}
+		}
+
+
 		CommandInputController::getInstance()->handleInputEntry();
+		//Add a small sleep to prevent the loop from consuming 100% CPU
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 
 	cout << "Main loop exited. Shutting down scheduler..." << std::endl;
@@ -32,9 +51,9 @@ int main() {
 	if (scheduler) {
 		scheduler->stop();
 	}
-	if (Kernel::getInstance()->getSchedulerThread().joinable()) {
-		Kernel::getInstance()->getSchedulerThread().join();
-	}
+	//if (Kernel::getInstance()->getSchedulerThread().joinable()) {
+	//	Kernel::getInstance()->getSchedulerThread().join();
+	//}
 	cout << "Scheduler shut down. Cleaning up resources." << endl;
 
 	CommandInputController::destroy();

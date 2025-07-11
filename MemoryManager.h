@@ -25,7 +25,7 @@ public:
     int getFragmentation() const;
     void printMemoryLayout(int cycle) const;
     int getProcessCount() const;
-
+    bool isAllocated(const std::string& processId) const;
 private:
     MemoryManager(int totalMemory);
     static MemoryManager* instance;

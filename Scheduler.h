@@ -54,9 +54,15 @@ public:
 	// --- Memory Config ---
 	int getMemPerProc() const;
 
+	void setGeneratingProcesses(bool shouldGenerate);
+	bool getGeneratingProcesses();
 
-
+	std::vector<Instruction> generateInstructionsForProcess(const std::string& screenName);
+	void startProcessGeneration();
+	void incrementCpuCycles();
+	int getQuantumCycles() const;
 private:
+
 
 	// --- Config ---
 	int numCores;
@@ -70,9 +76,9 @@ private:
 	int memPerProc = 4096;
 
 	// --- Metrics ---
-	int coresUsed = 0;
+	std::atomic<int> coresUsed = 0;
 	int coresAvailable;
-	int cpuCycles = 0;
+	std::atomic<int> cpuCycles = 0;
 	int idleCpuTicks = 0;
 
 	// --- Process Generation ---
@@ -93,8 +99,7 @@ private:
 	static Scheduler* scheduler;
 	string algorithm = "";
 	static mutex scheduler_init_mutex;
-
-	atomic<bool> generatingProcesses = false;
+	atomic<bool> generatingProcesses{ false };
 	void generateDummyProcesses();
 
 
