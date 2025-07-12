@@ -57,9 +57,10 @@ void CommandInputController::commandHandler(string command) {
             else {
                 Scheduler::initialize();
                 Kernel::getInstance()->setConfigInitialized(true);
-                thread([]() {
-                    Scheduler::getInstance()->start();
-                }).detach();
+                //thread([]() {
+                //    Scheduler::getInstance()->start();
+                //}).detach();
+                Scheduler::getInstance()->start();
                 cout << "Initialized successfully.\n";
             }
         }
@@ -316,4 +317,10 @@ void CommandInputController::commandHandler(string command) {
         }
     } 
 
+}
+
+void CommandInputController::startInputLoop() {
+    while (Kernel::getInstance()->getRunningStatus()) {
+        handleInputEntry(); // Your existing function already has the logic
+    }
 }

@@ -9,6 +9,7 @@
 #include <memory>
 #include <iostream>
 #include <vector> 
+#include <thread>
 
 using namespace std;
 
@@ -23,16 +24,21 @@ int main() {
 	ScreenManager::getInstance()->switchScreen("main");
 	CLIController::getInstance()->clearScreen();
 
+
+	// --- LAUNCH INPUT THREAD ---
+	// Launch a separate thread to handle user commands.
+	std::thread inputThread(&CommandInputController::startInputLoop, CommandInputController::getInstance());
+
+	// --- MAIN SIMULATION LOOP ---
 	while (Kernel::getInstance()->getRunningStatus()) {
 		auto scheduler = Scheduler::getInstance();
 		if (scheduler && scheduler->getSchedulerRunning()) {
-			// Increment the cycle on every loop
 			scheduler->incrementCpuCycles();
 
-			// Check for memory reporting on every cycle tick
 			if (scheduler->getAlgorithm() == "rr") {
 				int currentCycles = scheduler->getCpuCycles();
-				int quantum = scheduler->getQuantumCycles(); // You'll need to add a getter for this
+				int quantum = scheduler->getQuantumCycles(); 
+				///cout << "DEBUG" << quantum << "+" << currentCycles << endl;
 				if (quantum > 0 && currentCycles > 0 && currentCycles % quantum == 0) {
 					//cout << "DEBUG: Main loop printing memory layout at cycle " << currentCycles << endl;
 					MemoryManager::getInstance()->printMemoryLayout(currentCycles);
@@ -40,20 +46,44 @@ int main() {
 			}
 		}
 
+		// The call to handleInputEntry() is now gone from this loop.
 
-		CommandInputController::getInstance()->handleInputEntry();
-		//Add a small sleep to prevent the loop from consuming 100% CPU
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		// Add a small sleep to prevent the simulation from
+		// consuming 100% of a CPU core. , 2 cpu cycles per second
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	}
 
-	cout << "Main loop exited. Shutting down scheduler..." << std::endl;
+	//while (Kernel::getInstance()->getRunningStatus()) {
+	//	auto scheduler = Scheduler::getInstance();
+	//	if (scheduler && scheduler->getSchedulerRunning()) {
+	//		// Increment the cycle on every loop
+	//		scheduler->incrementCpuCycles();
+
+	//		// Check for memory reporting on every cycle tick
+	//		if (scheduler->getAlgorithm() == "rr") {
+
+	//		}
+	//	}
+
+
+	//	CommandInputController::getInstance()->handleInputEntry();
+	//	//Add a small sleep to prevent the loop from consuming 100% CPU
+	//	//std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	//}
+
+	cout << "Main loop exited. Waiting for input thread to join..." << endl;
+	// Wait for the input handling thread to finish its execution.
+	// This is critical to prevent the program from terminating prematurely.
+	if (inputThread.joinable()) {
+		inputThread.join();
+	}
+
+	cout << "Input thread joined. Shutting down scheduler..." << std::endl;
 	auto scheduler = Scheduler::getInstance();
 	if (scheduler) {
-		scheduler->stop();
+		scheduler->stop(); // This will join the scheduler's own threads.
 	}
-	//if (Kernel::getInstance()->getSchedulerThread().joinable()) {
-	//	Kernel::getInstance()->getSchedulerThread().join();
-	//}
+
 	cout << "Scheduler shut down. Cleaning up resources." << endl;
 
 	CommandInputController::destroy();
