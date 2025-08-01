@@ -13,7 +13,9 @@ enum class InstructionType {
     SUBTRACT,  
     SLEEP,  
     FOR, 
-    ENDFOR 
+    ENDFOR,
+    READ,
+	WRITE
 };
 //operands for an instruction
 struct Operand {
@@ -27,4 +29,5 @@ struct Instruction {
     std::vector<Operand> operands;
     std::string printMessage;
     std::vector<Instruction> innerInstructions;
+    uint16_t memoryAddress;
 };

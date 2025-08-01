@@ -26,6 +26,12 @@ public:
     void printMemoryLayout(int cycle) const;
     int getProcessCount() const;
     bool isAllocated(const std::string& processId) const;
+
+    bool readMemory(const string& processId, uint16_t address, uint16_t& value);
+	bool writeMemory(const string& processId, uint16_t address, uint16_t value);
+    bool isValidMemoryAccess(const string& processId, uint16_t address) const;
+    
+
 private:
     MemoryManager(int totalMemory);
     static MemoryManager* instance;
@@ -35,7 +41,10 @@ private:
     std::vector<MemoryBlock> memoryMap;
     mutable std::mutex mapMutex_;
 
+    unordered_map<string, unordered_map<uint16_t, uint16_t>> processMemoryData;
+    
     void mergeFreeBlocks();
+    pair<int, int> getProcessMemoryBounds(const string& processId) const;
 };
 
 

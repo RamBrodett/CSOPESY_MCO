@@ -59,6 +59,9 @@ bool MemoryManager::allocate(const std::string& processId, int size) {
 void MemoryManager::deallocate(const std::string& processId) {
     std::lock_guard<std::mutex> lock(mapMutex_);
 
+    /* For cleaning up memory data*/
+    processMemoryData.erase(processId);
+
 	/** this is the logic guys for further development
     * Find the memory block associated with the given processId, marks it
     * as "free," and then calls mergeFreeBlocks() to combine any adjacent
@@ -149,4 +152,50 @@ bool MemoryManager::isAllocated(const std::string& processId) const {
         }
     }
     return false;
+}
+
+pair<int, int> MemoryManager::getProcessMemoryBounds(const string& processId) const {
+    std::lock_guard<std::mutex> lock(mapMutex_);
+    for (const auto& block : memoryMap) {
+        if (block.processId == processId) {
+            return { block.startAddress, block.startAddress + block.size - 1 };
+        }
+    }
+    return { -1, -1 }; 
+}
+
+bool MemoryManager::isValidMemoryAccess(const string& processId, uint16_t address) const {
+    auto bounds = getProcessMemoryBounds(processId);
+    if (bounds.first == -1) return false;
+    return address >= bounds.first && address <= bounds.second;
+}
+
+bool MemoryManager::readMemory(const std::string& processId, uint16_t address, uint16_t& value) {
+    std::lock_guard<std::mutex> lock(mapMutex_);
+
+    if (!isValidMemoryAccess(processId, address)) {
+        return false; 
+    }
+
+    // Check if this memory location has been written to before
+    if (processMemoryData.find(processId) != processMemoryData.end() &&
+        processMemoryData[processId].find(address) != processMemoryData[processId].end()) {
+        value = processMemoryData[processId][address];
+    }
+    else {
+        value = 0; 
+    }
+
+    return true;
+}
+
+bool MemoryManager::writeMemory(const std::string& processId, uint16_t address, uint16_t value) {
+    std::lock_guard<std::mutex> lock(mapMutex_);
+
+    if (!isValidMemoryAccess(processId, address)) {
+        return false;
+    }
+
+    processMemoryData[processId][address] = value;
+    return true;
 }
