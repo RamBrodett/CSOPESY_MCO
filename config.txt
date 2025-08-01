@@ -8,3 +8,5 @@ delays-per-exec 1
 max-overall-mem 16384
 mem-per-frame 16
 mem-per-proc 4096
+min-mem-per-proc 64
+max-mem-per-proc 65536

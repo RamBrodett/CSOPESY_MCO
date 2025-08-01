@@ -2,8 +2,10 @@
 #include "CLIController.h"
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <iomanip>
 #include <numeric>
+
 
 MemoryManager* MemoryManager::instance = nullptr;
 std::mutex MemoryManager::mutex_;
@@ -33,7 +35,7 @@ MemoryManager::MemoryManager(int totalMemory) : totalMemory(totalMemory) {
 bool MemoryManager::allocate(const std::string& processId, int size) {
     std::lock_guard<std::mutex> lock(mapMutex_);
 
-	/** this is the logic guys for further development
+    /** this is the logic guys for further development
     * Iterate through the memory map to find the first available free block
     * that is large enough to accommodate the requested size. If a suitable
     * block is found, it is assigned to the process. If the block is larger
@@ -62,7 +64,7 @@ void MemoryManager::deallocate(const std::string& processId) {
     /* For cleaning up memory data*/
     processMemoryData.erase(processId);
 
-	/** this is the logic guys for further development
+    /** this is the logic guys for further development
     * Find the memory block associated with the given processId, marks it
     * as "free," and then calls mergeFreeBlocks() to combine any adjacent
     * free blocks to reduce fragmentation.
@@ -79,7 +81,7 @@ void MemoryManager::deallocate(const std::string& processId) {
 // Merges adjacent free memory blocks to reduce fragmentation.
 void MemoryManager::mergeFreeBlocks() {
     if (memoryMap.size() < 2) return;
-	// iterate through the memory map and merge adjacent free blocks
+    // iterate through the memory map and merge adjacent free blocks
     for (auto it = memoryMap.begin(); it != memoryMap.end() - 1; ) {
         auto next_it = it + 1;
         if (it->processId == "free" && next_it->processId == "free") {
@@ -161,7 +163,7 @@ pair<int, int> MemoryManager::getProcessMemoryBounds(const string& processId) co
             return { block.startAddress, block.startAddress + block.size - 1 };
         }
     }
-    return { -1, -1 }; 
+    return { -1, -1 };
 }
 
 bool MemoryManager::isValidMemoryAccess(const string& processId, uint16_t address) const {
@@ -174,7 +176,7 @@ bool MemoryManager::readMemory(const std::string& processId, uint16_t address, u
     std::lock_guard<std::mutex> lock(mapMutex_);
 
     if (!isValidMemoryAccess(processId, address)) {
-        return false; 
+        return false;
     }
 
     // Check if this memory location has been written to before
@@ -183,7 +185,7 @@ bool MemoryManager::readMemory(const std::string& processId, uint16_t address, u
         value = processMemoryData[processId][address];
     }
     else {
-        value = 0; 
+        value = 0;
     }
 
     return true;
@@ -198,4 +200,52 @@ bool MemoryManager::writeMemory(const std::string& processId, uint16_t address, 
 
     processMemoryData[processId][address] = value;
     return true;
+}
+
+// writes a page to the backing store file
+void MemoryManager::writePageToBackingStore(const std::string& processId, int pageNumber, const std::vector<uint16_t>& pageData) {
+    std::ofstream file("csopesy-backing-store.txt", std::ios::app | std::ios::binary);
+    if (!file) return;
+    file << processId << " " << pageNumber << " " << pageData.size() << "\n";
+    file.write(reinterpret_cast<const char*>(pageData.data()), pageData.size() * sizeof(uint16_t));
+    file << "\n";
+    file.close();
+}
+
+// reads a page from the backing store file
+bool MemoryManager::readPageFromBackingStore(const std::string& processId, int pageNumber, std::vector<uint16_t>& pageData) {
+    std::ifstream file("csopesy-backing-store.txt", std::ios::binary);
+    if (!file) return false;
+    std::string line;
+    while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        std::string pid;
+        int pnum, psize;
+        if (!(iss >> pid >> pnum >> psize)) continue;
+        if (pid == processId && pnum == pageNumber) {
+            pageData.resize(psize);
+            file.read(reinterpret_cast<char*>(pageData.data()), psize * sizeof(uint16_t));
+            return true;
+        } else {
+            file.seekg(psize * sizeof(uint16_t) + 1, std::ios::cur);
+        }
+    }
+    return false;
+}
+
+/** TO BE IMPLEMENTED, once frame tables are implemented: 
+* Handles a page fault by attempting to load the requested page from the backing store.
+* If the page is not found, it will log an error or take appropriate action.
+* If it is in the backing store, it will load the page into memory (remove from backing store and 
+* transfer into frame table OR basically memory).
+**/
+void MemoryManager::handlePageFault(const std::string& processId, int pageNumber, int pageSize) {
+    // try loading page from backing store
+    std::vector<uint16_t> pageData(pageSize / 2, 0); 
+    bool found = readPageFromBackingStore(processId, pageNumber, pageData);
+    if (!found) {
+		// not found means the file doesn't exist in either frame table or backing store
+    }
+
+    std::cout << "Page fault handled for process " << processId << ", page " << pageNumber << std::endl;
 }

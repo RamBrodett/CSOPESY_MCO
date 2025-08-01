@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <mutex>
+#include <unordered_map>
 using namespace std;
 
 // Represents a block of memory, either allocated or free.
@@ -31,6 +32,11 @@ public:
 	bool writeMemory(const string& processId, uint16_t address, uint16_t value);
     bool isValidMemoryAccess(const string& processId, uint16_t address) const;
     
+    // --- Paging & Backing Store ---
+    void writePageToBackingStore(const std::string& processId, int pageNumber, const std::vector<uint16_t>& pageData);
+    bool readPageFromBackingStore(const std::string& processId, int pageNumber, std::vector<uint16_t>& pageData);
+    void handlePageFault(const std::string& processId, int pageNumber, int pageSize);
+
 
 private:
     MemoryManager(int totalMemory);
@@ -41,7 +47,7 @@ private:
     std::vector<MemoryBlock> memoryMap;
     mutable std::mutex mapMutex_;
 
-    unordered_map<string, unordered_map<uint16_t, uint16_t>> processMemoryData;
+    mutable unordered_map<string, unordered_map<uint16_t, uint16_t>> processMemoryData;
     
     void mergeFreeBlocks();
     pair<int, int> getProcessMemoryBounds(const string& processId) const;

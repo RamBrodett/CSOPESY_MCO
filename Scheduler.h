@@ -53,6 +53,7 @@ public:
 
 	// --- Memory Config ---
 	int getMemPerProc() const;
+	int getRandomPowerOf2(int minVal, int maxVal);
 
 	void setGeneratingProcesses(bool shouldGenerate);
 	bool getGeneratingProcesses();
@@ -74,6 +75,8 @@ private:
 	int maxOverallMem = 16384;
 	int memPerFrame = 16;
 	int memPerProc = 4096;
+	int minMemPerProc = 64;    
+	int maxMemPerProc = 65536; 
 
 	// --- Metrics ---
 	std::atomic<int> coresUsed = 0;

@@ -383,7 +383,8 @@ void Scheduler::loadConfig() {
         coresAvailable = numCores;
 		maxOverallMem = 16384; //default 16MB
 		memPerFrame = 16; //default 16KB
-		memPerProc = 4096; //default 4KB
+        minMemPerProc = 64;    // default 64 bytes
+        maxMemPerProc = 65536; // default 65536 bytes (64 KB)
         return;
     }
 
@@ -443,6 +444,14 @@ void Scheduler::loadConfig() {
             memPerProc = stoi(value);
 			if (memPerProc < 1) memPerProc = 1;
         }
+		else if (key == "min-mem-per-proc") {
+            minMemPerProc = stoi(value);
+            if (minMemPerProc < 64) minMemPerProc = 64;
+        }
+        else if (key == "max-mem-per-proc") {
+            maxMemPerProc = stoi(value);
+            if (maxMemPerProc > 65536) maxMemPerProc = 65536;
+        }
     }
     //assign cores available
     coresAvailable = numCores;
@@ -477,4 +486,17 @@ void Scheduler::incrementCpuCycles() {
 }
 int Scheduler::getQuantumCycles() const {
     return quantumCycles;
+}
+
+// helper function to get a random power of 2 within a range (used primarily for min/max mem proc)
+int Scheduler::getRandomPowerOf2(int minVal, int maxVal) {
+    std::vector<int> powers;
+    for (int v = minVal; v <= maxVal; v <<= 1) {
+        powers.push_back(v);
+    }
+    if (powers.empty()) return minVal;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dist(0, powers.size() - 1);
+    return powers[dist(gen)];
 }
