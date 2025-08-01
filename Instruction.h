@@ -13,7 +13,9 @@ enum class InstructionType {
     SUBTRACT,  
     SLEEP,  
     FOR, 
-    ENDFOR 
+    ENDFOR,
+    READ, 
+    WRITE
 };
 //operands for an instruction
 struct Operand {

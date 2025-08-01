@@ -8,10 +8,11 @@
 MemoryManager* MemoryManager::instance = nullptr;
 std::mutex MemoryManager::mutex_;
 
-void MemoryManager::initialize(int totalMemory) {
+// --- Singleton and Initialization ---
+void MemoryManager::initialize(int totalMemory, int pageSize) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!instance) {
-        instance = new MemoryManager(totalMemory);
+        instance = new MemoryManager(totalMemory, pageSize);
     }
 }
 
@@ -25,128 +26,129 @@ void MemoryManager::destroy() {
     instance = nullptr;
 }
 
-MemoryManager::MemoryManager(int totalMemory) : totalMemory(totalMemory) {
-    memoryMap.push_back({ "free", 0, totalMemory });
+MemoryManager::MemoryManager(int totalMemory, int pageSize)
+    : totalMemory(totalMemory), pageSize(pageSize) {
+    if (pageSize <= 0) pageSize = 1;
+    this->numFrames = totalMemory / pageSize;
+    this->physicalFrames.resize(numFrames);
 }
 
-// Allocates a block of memory using the first-fit algorithm(for now).
-bool MemoryManager::allocate(const std::string& processId, int size) {
-    std::lock_guard<std::mutex> lock(mapMutex_);
-
-	/** this is the logic guys for further development
-    * Iterate through the memory map to find the first available free block
-    * that is large enough to accommodate the requested size. If a suitable
-    * block is found, it is assigned to the process. If the block is larger
-    * than required, it is split into an allocated block and a new free block.
-    */
-
-    for (auto it = memoryMap.begin(); it != memoryMap.end(); ++it) {
-        if (it->processId == "free" && it->size >= size) {
-            int remainingSize = it->size - size;
-            it->size = size;
-            it->processId = processId;
-
-            if (remainingSize > 0) {
-                memoryMap.insert(it + 1, { "free", it->startAddress + size, remainingSize });
-            }
-            return true;
-        }
-    }
-    return false; // No suitable block found
+// --- Public Interface for Demand Paging ---
+void MemoryManager::createProcessPageTable(const std::string& processId, int virtualMemorySize) {
+    std::lock_guard<std::mutex> lock(managerMutex);
+    if (pageSize <= 0) return;
+    int numPages = (virtualMemorySize + pageSize - 1) / pageSize;
+    processPageTables[processId] = std::vector<PageTableEntry>(numPages);
+    backingStore[processId].resize((size_t)virtualMemorySize / 2, 0); // For uint16_t
 }
 
-//Deallocates the memory assigned to a specific process.
-void MemoryManager::deallocate(const std::string& processId) {
-    std::lock_guard<std::mutex> lock(mapMutex_);
-
-	/** this is the logic guys for further development
-    * Find the memory block associated with the given processId, marks it
-    * as "free," and then calls mergeFreeBlocks() to combine any adjacent
-    * free blocks to reduce fragmentation.
-    */
-    for (auto& block : memoryMap) {
-        if (block.processId == processId) {
-            block.processId = "free";
-            break;
-        }
-    }
-    mergeFreeBlocks();
-}
-
-// Merges adjacent free memory blocks to reduce fragmentation.
-void MemoryManager::mergeFreeBlocks() {
-    if (memoryMap.size() < 2) return;
-	// iterate through the memory map and merge adjacent free blocks
-    for (auto it = memoryMap.begin(); it != memoryMap.end() - 1; ) {
-        auto next_it = it + 1;
-        if (it->processId == "free" && next_it->processId == "free") {
-            it->size += next_it->size;
-            memoryMap.erase(next_it);
-        }
-        else {
-            ++it;
+void MemoryManager::accessPage(const std::string& processId, int pageNumber) {
+    std::lock_guard<std::mutex> lock(managerMutex);
+    if (processPageTables.count(processId) && pageNumber < processPageTables[processId].size()) {
+        if (!processPageTables[processId][pageNumber].present) {
+            handlePageFault(processId, pageNumber);
         }
     }
 }
 
-int MemoryManager::getFragmentation() const {
-    //std::lock_guard<std::mutex> lock(mapMutex_);
-    int freeMemory = 0;
-    for (const auto& block : memoryMap) {
-        if (block.processId == "free") {
-            freeMemory += block.size;
+void MemoryManager::deallocateProcess(const std::string& processId) {
+    std::lock_guard<std::mutex> lock(managerMutex);
+    for (int i = 0; i < numFrames; ++i) {
+        if (physicalFrames[i].processId == processId) {
+            physicalFrames[i].isFree = true;
+            physicalFrames[i].processId = "";
+            physicalFrames[i].pageNumber = -1;
         }
     }
-    return freeMemory;
+    processPageTables.erase(processId);
+    backingStore.erase(processId); // Also clear from backing store map
+    fifoQueue.remove_if([&](int frameIndex) { return physicalFrames[frameIndex].processId == processId || physicalFrames[frameIndex].isFree; });
 }
 
-int MemoryManager::getProcessCount() const {
-    int count = 0;
-    for (const auto& block : memoryMap) {
-        if (block.processId != "free") {
-            count++;
-        }
+uint16_t MemoryManager::readFromMemory(const std::string& processId, int address) {
+    // This function assumes the page is already in memory.
+    // Address is the virtual address in bytes.
+    return backingStore[processId][address / 2];
+}
+
+void MemoryManager::writeToMemory(const std::string& processId, int address, uint16_t value) {
+    // This function assumes the page is already in memory.
+    int pageNumber = address / pageSize;
+    int frameNumber = processPageTables[processId][pageNumber].frameNumber;
+
+    physicalFrames[frameNumber].isDirty = true; // Mark the frame as dirty
+    backingStore[processId][address / 2] = value;
+}
+
+
+// --- Private Helper Methods ---
+void MemoryManager::handlePageFault(const std::string& processId, int pageNumber) {
+    pagedInCount++; // For vmstat
+    int frameIndex = findFreeFrame();
+    if (frameIndex == -1) {
+        frameIndex = evictPageFIFO();
     }
-    return count;
+    physicalFrames[frameIndex].isFree = false;
+    physicalFrames[frameIndex].processId = processId;
+    physicalFrames[frameIndex].pageNumber = pageNumber;
+    physicalFrames[frameIndex].isDirty = false;
+    processPageTables[processId][pageNumber].present = true;
+    processPageTables[processId][pageNumber].frameNumber = frameIndex;
+    fifoQueue.push_back(frameIndex);
 }
 
+int MemoryManager::findFreeFrame() {
+    for (int i = 0; i < numFrames; ++i) {
+        if (physicalFrames[i].isFree) return i;
+    }
+    return -1;
+}
+
+int MemoryManager::evictPageFIFO() {
+    pagedOutCount++; // For vmstat
+    int victimFrameIndex = fifoQueue.front();
+    fifoQueue.pop_front();
+
+    const auto& victimFrame = physicalFrames[victimFrameIndex];
+    if (processPageTables.count(victimFrame.processId)) {
+        // In a real system, if victimFrame.isDirty, we'd write to a file here.
+        // For this simulation, the write happens immediately in writeToMemory.
+        processPageTables[victimFrame.processId][victimFrame.pageNumber].present = false;
+        processPageTables[victimFrame.processId][victimFrame.pageNumber].frameNumber = -1;
+    }
+    return victimFrameIndex;
+}
+
+// --- NEW: Corrected memory layout printing for demand paging ---
 void MemoryManager::printMemoryLayout(int cycle) const {
-    std::lock_guard<std::mutex> lock(mapMutex_); // This lock is sufficient for both functions
+    std::lock_guard<std::mutex> lock(managerMutex);
     std::string filename = "memory_stamp_" + std::to_string(cycle) + ".txt";
     std::ofstream outFile(filename);
 
-    if (!outFile.is_open()) {
-        std::cerr << "Error: Could not open file " << filename << std::endl;
-        return;
-    }
-
+    outFile << "--- Physical Memory Frames at Cycle " << cycle << " ---" << std::endl;
     outFile << "Timestamp: (" << CLIController::getInstance()->getTimestamp() << ")" << std::endl;
-    outFile << "Number of processes in memory: " << getProcessCount() << std::endl; // getProcessCount will now execute under the existing lock
-    outFile << "Total external fragmentation in KB: " << getFragmentation() << std::endl;
-    outFile << std::endl;
+    outFile << "Total Frames: " << numFrames << " | Page Size: " << pageSize << " KB" << std::endl;
+    outFile << std::left << std::setw(10) << "Frame #" << std::setw(15) << "Status" << std::setw(20) << "Process ID" << std::setw(15) << "Page #" << std::endl;
+    outFile << "----------------------------------------------------------" << std::endl;
 
-    outFile << "---end--- = " << totalMemory << std::endl;
-    outFile << std::endl;
-
-    for (auto it = memoryMap.rbegin(); it != memoryMap.rend(); ++it) {
-        if (it->processId != "free") {
-            outFile << it->startAddress + it->size << std::endl;
-            outFile << it->processId << std::endl;
-            outFile << it->startAddress << std::endl;
-            outFile << std::endl;
+    for (int i = 0; i < numFrames; ++i) {
+        outFile << std::left << std::setw(10) << i;
+        if (physicalFrames[i].isFree) {
+            outFile << std::setw(15) << "Free" << std::endl;
+        }
+        else {
+            outFile << std::setw(15) << "Used" << std::setw(20) << physicalFrames[i].processId << std::setw(15) << physicalFrames[i].pageNumber << std::endl;
         }
     }
-
-    outFile << "---start--- = 0" << std::endl;
     outFile.close();
 }
 
-bool MemoryManager::isAllocated(const std::string& processId) const {
-    std::lock_guard<std::mutex> lock(mapMutex_);
-    for (const auto& block : memoryMap) {
-        if (block.processId == processId) {
-            return true;
-        }
-    }
-    return false;
+// --- Getters for vmstat and process-smi ---
+int MemoryManager::getTotalFrameCount() const { return numFrames; }
+int MemoryManager::getUsedFrameCount() const {
+    int count = 0;
+    for (const auto& frame : physicalFrames) if (!frame.isFree) count++;
+    return count;
 }
+int MemoryManager::getPagedInCount() const { return pagedInCount.load(); }
+int MemoryManager::getPagedOutCount() const { return pagedOutCount.load(); }

@@ -8,28 +8,38 @@
 #include <chrono>
 #include <numeric>
 #include <stack>
+#include "MemoryManager.h" // Add this line
 #include "Scheduler.h"
 using namespace std;
 // Corrected Constructor to match header declaration order
-Screen::Screen(string name, std::vector<Instruction> instructions, string timestamp)
-    : name(name), instructions(instructions), timestamp(timestamp), programCounter(0),
-    cpuCoreID(-1), isRunning(false) {
+Screen::Screen(string name, int virtualMemorySize, vector<Instruction> instructions, string timestamp)
+    : name(name), virtualMemorySize(virtualMemorySize), instructions(instructions), timestamp(timestamp),
+    programCounter(0), cpuCoreID(-1), isRunning(false), memoryAccessViolation(false), violationAddress(0) {
 }
 
 Screen::Screen()
-    : name(""), instructions({}), timestamp(CLIController::getInstance()->getTimestamp()),
-    programCounter(0), cpuCoreID(-1), isRunning(false) {
+    : name(""), virtualMemorySize(0), instructions({}), timestamp(CLIController::getInstance()->getTimestamp()),
+    programCounter(0), cpuCoreID(-1), isRunning(false), memoryAccessViolation(false), violationAddress(0) {
 }
+
 
 // --- Getters (definitions match the corrected header) ---
 string Screen::getName() const { return name; }
 int Screen::getProgramCounter() const { return programCounter; }
-int Screen::getTotalInstructions() const { return instructions.size(); }
+int Screen::getTotalInstructions() const {
+    return static_cast<int>(instructions.size()); // Add static_cast
+}
 string Screen::getTimestamp() const { return timestamp; }
 string Screen::getTimestampFinished() const { return timestampFinished; }
 int Screen::getCoreID() const { return cpuCoreID; }
 bool Screen::getIsRunning() const { return isRunning; }
-bool Screen::isFinished() const { return programCounter >= getTotalInstructions(); }
+bool Screen::isFinished() const { return programCounter >= getTotalInstructions() || memoryAccessViolation; }
+int Screen::getVirtualMemorySize() const { return virtualMemorySize; }
+bool Screen::hasMemoryViolation() const { return memoryAccessViolation; }
+int Screen::getViolationAddress() const { return violationAddress; }
+string Screen::getViolationTimestamp() const { return violationTimestamp; }
+
+
 std::vector<std::string> Screen::getOutputBuffer() const {
     std::lock_guard<std::mutex> lock(outputMutex);
     return outputBuffer;
@@ -123,15 +133,26 @@ void Screen::executeInstructionList(const std::vector<Instruction>& instructionL
 }
 
 
+// new
+void Screen::triggerMemoryViolation(int address) {
+    if (memoryAccessViolation) return; // Only trigger once
+    memoryAccessViolation = true;
+    violationAddress = address;
+    violationTimestamp = CLIController::getInstance()->getTimestamp();
+    string log = "FATAL: Memory Access Violation at address 0x" + to_string(address);
+    addOutput(log);
+}
+
+// --- HEAVILY MODIFIED EXECUTE METHOD ---
 void Screen::execute(int quantum) {
     if (isFinished()) return;
     setIsRunning(true);
 
-    // Determine how many top-level instructions to run
     int instructionsToExecute = (quantum == -1) ? (getTotalInstructions() - programCounter) : quantum;
 
     for (int i = 0; i < instructionsToExecute && !isFinished(); ++i) {
         const auto& instruction = instructions[programCounter];
+        int pageSize = Scheduler::getInstance()->getPageSize(); // Get page size from scheduler config
 
         // --- Busy-wait delay ---
         int delay = Scheduler::getInstance()->getDelayPerExec();
@@ -140,31 +161,50 @@ void Screen::execute(int quantum) {
         }
 
         switch (instruction.type) {
-
         case InstructionType::DECLARE:
         case InstructionType::ADD:
         case InstructionType::SUBTRACT:
         case InstructionType::PRINT:
-        case InstructionType::SLEEP:
-            //for simple instructions, just execute them using the helper
-            executeInstructionList({ instruction });
+            executeInstructionList({ instruction }); // Simple instructions
             break;
 
-        case InstructionType::FOR: {
-            uint16_t repeats = getOperandValue(instruction.operands[0]);
-            for (uint16_t j = 0; j < repeats; ++j) {
-                //call the helper to execute the inner instructions
-                executeInstructionList(instruction.innerInstructions);
+        case InstructionType::READ: {
+            int address = getOperandValue(instruction.operands[1]);
+            if (address >= virtualMemorySize || address < SYMBOL_TABLE_SIZE) {
+                triggerMemoryViolation(address);
+                break;
             }
+            int pageNumber = address / pageSize;
+            MemoryManager::getInstance()->accessPage(name, pageNumber); // Page Fault Happens Here!
+            uint16_t value = MemoryManager::getInstance()->readFromMemory(name, address);
+            setVariableValue(instruction.operands[0].variableName, value);
             break;
         }
+        case InstructionType::WRITE: {
+            int address = getOperandValue(instruction.operands[0]);
+            uint16_t value = getOperandValue(instruction.operands[1]);
+            if (address >= virtualMemorySize || address < SYMBOL_TABLE_SIZE) {
+                triggerMemoryViolation(address);
+                break;
+            }
+            int pageNumber = address / pageSize;
+            MemoryManager::getInstance()->accessPage(name, pageNumber); // Page Fault Happens Here!
+            MemoryManager::getInstance()->writeToMemory(name, address, value);
+            break;
         }
-     
+        case InstructionType::SLEEP:
+            this_thread::sleep_for(chrono::milliseconds(getOperandValue(instruction.operands[0])));
+            break;
+            // ... (keep FOR loop logic)
+        }
+
         programCounter++;
     }
 
     if (isFinished()) {
-        setTimestampFinished(CLIController::getInstance()->getTimestamp());
+        if (!hasMemoryViolation()) {
+            setTimestampFinished(CLIController::getInstance()->getTimestamp());
+        }
         setIsRunning(false);
     }
-};
+}

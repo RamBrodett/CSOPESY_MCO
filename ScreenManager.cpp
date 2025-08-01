@@ -48,32 +48,32 @@ bool ScreenManager::hasScreen(const string& name) const {
     return screens.find(name) != screens.end();
 }
 
-void ScreenManager::displayProcessSMI() {
-    shared_ptr<Screen> screenPtr = getCurrentScreen();
-    if (!screenPtr || screenPtr->getName() == "main") {
-        cout << "No process screen selected." << endl;
-        return;
-    }
-
-    Screen& screen = *screenPtr;
-    bool isFinished = screen.isFinished();
-
-    cout << "Process name: " << screen.getName() << endl;
-    cout << "Logs:" << endl;
-
-    // Use the getter to access logs safely
-    for (const auto& line : screen.getOutputBuffer()) {
-        cout << line << endl;
-    }
-
-    cout << endl;
-    if (isFinished) {
-        cout << endl << "Finished!" << endl;
-    }
-    else {
-        cout << "Current instruction line: " << screen.getProgramCounter() << endl;
-        cout << "Lines of code: " << screen.getTotalInstructions() << endl;
-    }
-
-    
-}
+//void ScreenManager::displayProcessSMI() {
+//    shared_ptr<Screen> screenPtr = getCurrentScreen();
+//    if (!screenPtr || screenPtr->getName() == "main") {
+//        cout << "No process screen selected." << endl;
+//        return;
+//    }
+//
+//    Screen& screen = *screenPtr;
+//    bool isFinished = screen.isFinished();
+//
+//    cout << "Process name: " << screen.getName() << endl;
+//    cout << "Logs:" << endl;
+//
+//    // Use the getter to access logs safely
+//    for (const auto& line : screen.getOutputBuffer()) {
+//        cout << line << endl;
+//    }
+//
+//    cout << endl;
+//    if (isFinished) {
+//        cout << endl << "Finished!" << endl;
+//    }
+//    else {
+//        cout << "Current instruction line: " << screen.getProgramCounter() << endl;
+//        cout << "Lines of code: " << screen.getTotalInstructions() << endl;
+//    }
+//
+//    
+//}

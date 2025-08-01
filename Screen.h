@@ -16,20 +16,28 @@ public:
         FINISHED
     };
     // -- Contructors --
-    Screen(std::string name, std::vector<Instruction> instructions, std::string timestamp);
+    Screen(std::string name, int virtualMemorySize, std::vector<Instruction> instructions, std::string timestamp);
     Screen();
 
     // --- Getters ---
     std::string getName() const;
     int getProgramCounter() const;
-    int getTotalInstructions() const; //casted from size_t to int
+    int getTotalInstructions() const;
     std::string getTimestamp() const;
     std::string getTimestampFinished() const;
     int getCoreID() const;
     bool getIsRunning() const;
-    std::vector<std::string> flushOutputBuffer(); //clears and returns output
     bool isFinished() const;
+    bool hasMemoryViolation() const; // New
+    int getViolationAddress() const; // New
+    std::string getViolationTimestamp() const; // New
+    int getVirtualMemorySize() const; // New
+
     std::vector<std::string> getOutputBuffer() const;
+    std::vector<std::string> flushOutputBuffer();
+
+
+
 
     // --- Setters ---
     void setName(std::string name);
@@ -59,7 +67,20 @@ private:
     std::string timestampFinished;
     bool isRunning; 
 
+
+    // --- NEW: Helper for memory violation ---
+    void triggerMemoryViolation(int address);
+
+    // --- NEW: Process State & Memory ---
+    int virtualMemorySize;
+    bool memoryAccessViolation = false;
+    int violationAddress = 0;
+    std::string violationTimestamp;
+    const int SYMBOL_TABLE_SIZE = 64;
+
+
     std::unordered_map<std::string, uint16_t> variables; //memory storage for the process's variables
     mutable std::mutex outputMutex; //protect concurrent access to the outputBUffer
     std::vector<std::string> outputBuffer; //buffer to store log messages from PRINT
 };
+

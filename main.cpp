@@ -19,7 +19,7 @@ int main() {
 	CLIController::initialize();
 	CommandInputController::initialize();
 
-	auto mainScreen = make_shared<Screen>("main", vector<Instruction>{}, CLIController::getInstance()->getTimestamp());
+	auto mainScreen = make_shared<Screen>("main", 0, vector<Instruction>{}, CLIController::getInstance()->getTimestamp());
 	ScreenManager::getInstance()->registerScreen("main", mainScreen);
 	ScreenManager::getInstance()->switchScreen("main");
 	CLIController::getInstance()->clearScreen();
@@ -33,10 +33,15 @@ int main() {
 	while (Kernel::getInstance()->getRunningStatus()) {
 		auto scheduler = Scheduler::getInstance();
 		if (scheduler && scheduler->getSchedulerRunning()) {
-			scheduler->incrementCpuCycles();
+			scheduler->incrementCpuCycles(); // This is your total ticks
+
+			// --- ADDED: Logic for idle tick counting ---
+			if (scheduler->getUsedCores() == 0) {
+				scheduler->incrementIdleCpuTicks(); // You will need to create this function
+			}
 
 			if (scheduler->getAlgorithm() == "rr") {
-				int currentCycles = scheduler->getCpuCycles();
+				int currentCycles = scheduler->getCpuCycles();	
 				int quantum = scheduler->getQuantumCycles(); 
 				///cout << "DEBUG" << quantum << "+" << currentCycles << endl;
 				if (quantum > 0 && currentCycles > 0 && currentCycles % quantum == 0) {

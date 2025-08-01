@@ -1,3 +1,4 @@
+// Corrected Scheduler.h
 #pragma once
 #include <condition_variable>
 #include <mutex>
@@ -6,101 +7,78 @@
 #include <thread>
 #include <memory>
 #include <atomic>
-#include "MemoryManager.h"
 #include "Screen.h"
 #include <vector>
-using namespace std;
-
 
 class Scheduler {
 public:
+    Scheduler();
+    static Scheduler* getInstance();
+    static void initialize();
 
-	enum STATES {
-		READY,
-		WAITING,
-		RUNNING,
-		FINISHED
-	};
+    void addProcessToQueue(std::shared_ptr<Screen> screen);
+    void start();
+    void stop();
+    void loadConfig();
 
-	Scheduler();
+    // --- Status & Metrics Getters ---
+    bool getSchedulerRunning() const;
+    int getUsedCores() const;
+    int getAvailableCores() const;
+    long long getCpuCycles() const;
+    int getDelayPerExec() const;
+    std::string getAlgorithm() const;
+    int getQuantumCycles() const;
+    int getPageSize() const;
+    long long getIdleCpuTicks() const;
+    long long getActiveCpuTicks() const;
+    bool getGeneratingProcesses();
 
-	// --- Singleton Access ---
-	static Scheduler* getInstance();
-	static void initialize();
+    // --- Setters ---
+    void setSchedulerRunning(bool val);
+    void setGeneratingProcesses(bool shouldGenerate);
 
-	// --- Process Queue Management ---
+    // --- Public Utilities ---
+    std::vector<Instruction> generateInstructionsForProcess(const std::string& screenName);
+    void startProcessGeneration();
+    void incrementCpuCycles();
+    void incrementIdleCpuTicks(); // Added this
 
-	void addProcessToQueue(shared_ptr<Screen> screen);
-
-	// --- Scheduler ---
-	void start();
-	void stop();
-	void loadConfig();
-	bool getSchedulerRunning() const;
-	void setSchedulerRunning(bool val);
-
-	// --- CPU and Core Status ---
-	int getUsedCores() const;
-	int getAvailableCores() const;
-	int getIdleCpuTicks();
-	int getCpuCycles() const;
-	void setCpuCycles(int cpuCycles);
-	int getDelayPerExec() const;
-
-	// --- Algorithm Configuration ---
-	void setAlgorithm(const string& algo);
-	string getAlgorithm() const;
-
-	// --- Memory Config ---
-	int getMemPerProc() const;
-
-	void setGeneratingProcesses(bool shouldGenerate);
-	bool getGeneratingProcesses();
-
-	std::vector<Instruction> generateInstructionsForProcess(const std::string& screenName);
-	void startProcessGeneration();
-	void incrementCpuCycles();
-	int getQuantumCycles() const;
 private:
+    // --- Config ---
+    int numCores = 0;
+    int quantumCycles = 1;
+    int batchProcessFreq = 1;
+    int minInstructions = 1;
+    int maxInstructions = 100;
+    int delayPerExec = 0;
+    int maxOverallMem = 16384;
+    int memPerFrame = 256;
+    int memPerProc = 1024;
+    std::string algorithm = "rr";
 
+    // --- Metrics ---
+    std::atomic<int> coresUsed{ 0 };
+    int coresAvailable = 0;
+    std::atomic<long long> cpuCycles{ 0 };
+    std::atomic<long long> idleCpuTicks{ 0 };
+    std::atomic<long long> activeCpuTicks{ 0 };
 
-	// --- Config ---
-	int numCores;
-	int quantumCycles = 1;
-	int batchProcessFreq = 1;
-	int minInstructions = 1;
-	int maxInstructions = 1;
-	int delayPerExec = 0;
-	int maxOverallMem = 16384;
-	int memPerFrame = 16;
-	int memPerProc = 4096;
+    // --- Process Generation ---
+    std::thread processGeneratorThread;
+    int lastGenCycle = 0;
+    int generatedProcessCount = 0;
+    std::atomic<bool> generatingProcesses{ false };
 
-	// --- Metrics ---
-	std::atomic<int> coresUsed = 0;
-	int coresAvailable;
-	std::atomic<int> cpuCycles = 0;
-	int idleCpuTicks = 0;
+    // --- Scheduler State ---
+    std::atomic<bool> schedulerRunning{ false };
+    std::vector<std::thread> workerThreads;
+    std::queue<std::shared_ptr<Screen>> processQueue;
+    std::mutex processQueueMutex;
+    std::condition_variable processQueueCondition;
 
-	// --- Process Generation ---
-	thread processGeneratorThread;
-	int generationIntervalTicks = 5;
-	int lastGenCycle = 0;
-	int generatedProcessCount = 0;
-
-	// --- Scheduler State ---
-	atomic<bool> schedulerRunning{ false };
-	int activeThreads;
-	vector<thread> workerThreads;
-	queue<shared_ptr<Screen>> processQueue; 
-	mutex processQueueMutex;
-	condition_variable processQueueCondition;
-
-	// --- Singleton ---
-	static Scheduler* scheduler;
-	string algorithm = "";
-	static mutex scheduler_init_mutex;
-	atomic<bool> generatingProcesses{ false };
-	void generateDummyProcesses();
-
-
+    // --- Singleton ---
+    static Scheduler* scheduler;
+    static std::mutex scheduler_init_mutex;
+    void generateDummyProcesses();
 };
