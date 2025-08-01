@@ -57,20 +57,15 @@ void CommandInputController::commandHandler(string command) {
             else {
                 Scheduler::initialize();
                 Kernel::getInstance()->setConfigInitialized(true);
+                //thread([]() {
+                //    Scheduler::getInstance()->start();
+                //}).detach();
+                Scheduler::getInstance()->start();
                 cout << "Initialized successfully.\n";
             }
         }
         else if (command == "exit") {
             cout << "Exiting program...\n";
-            //get scheduler instance
-            auto scheduler = Scheduler::getInstance();
-            //check if scheduler is nullpointer
-            if (scheduler && scheduler->getSchedulerRunning()) {
-                scheduler->stop();
-                if (Kernel::getInstance()->getSchedulerThread().joinable()) {
-                    Kernel::getInstance()->getSchedulerThread().join();
-                }
-            }
             Kernel::getInstance()->setRunningStatus(false);
         }
         else if (command == "help") {
@@ -84,6 +79,14 @@ void CommandInputController::commandHandler(string command) {
             cout << "clear               : Clear the screen\n";
             cout << "exit                : Exit program\n";
         }
+        //else if (command == "debug-cycles") {
+        //    if (Scheduler::getInstance()) {
+        //        cout << "Current CPU Cycles: " << Scheduler::getInstance()->getCpuCycles() << endl;
+        //    }
+        //    else {
+        //        cout << "Scheduler not initialized." << endl;
+        //    }
+        //}
         else if (command == "clear") {
             CLIController::getInstance()->clearScreen();
         }
@@ -162,16 +165,15 @@ void CommandInputController::commandHandler(string command) {
                     cout << "Screen '" << screenName << "' already exists.\n";
                 }
                 else {
-                    vector<Instruction> defaultInstructions = {
-                        {InstructionType::PRINT, {}, "Hello from new screen '" + screenName + "'!"},
-                        {InstructionType::SLEEP, {{false, "", 100}}, ""}
-                    };
-                    auto newScreen = make_shared<Screen>(screenName, defaultInstructions, CLIController::getInstance()->getTimestamp());
+                    // Use the new method to get randomized instructions
+                    auto newInstructions = Scheduler::getInstance()->generateInstructionsForProcess(screenName);
+                    auto newScreen = make_shared<Screen>(screenName, newInstructions, CLIController::getInstance()->getTimestamp());
                     ScreenManager::getInstance()->registerScreen(screenName, newScreen);
+                    // Add the new screen to the scheduler's queue
+                    Scheduler::getInstance()->addProcessToQueue(newScreen);
                     ScreenManager::getInstance()->switchScreen(screenName);
                     CLIController::getInstance()->clearScreen();
                 }
-
             }
             else if (subcommand == "-r") {
                 ss >> screenName;
@@ -200,27 +202,34 @@ void CommandInputController::commandHandler(string command) {
             }
         }
         else if (command == "scheduler-start") {
-            if (Scheduler::getInstance()->getSchedulerRunning()) {
-                cout << "Scheduler is already running.\n";
+            auto scheduler = Scheduler::getInstance();
+            if (scheduler && scheduler->getSchedulerRunning()) {
+                if (scheduler->getGeneratingProcesses()) {
+                    cout << "Scheduler is already active.\n";
+                }
+                else {
+                    cout << "Starting scheduler...\n";
+                    scheduler->startProcessGeneration();
+                }
             }
             else {
-                cout << "Starting scheduler and dummy process generator...\n";
-                Kernel::getInstance()->getSchedulerThread() = thread([]() {
-                    Scheduler::getInstance()->start();
-                    });
+                cout << "Scheduler is not running. Please 'initialize' the kernel first.\n";
             }
         }
         else if (command == "scheduler-stop") {
-            if (!Scheduler::getInstance()->getSchedulerRunning() && !Kernel::getInstance()->getSchedulerThread().joinable()) {
+            auto scheduler = Scheduler::getInstance();
+            if (scheduler && scheduler->getSchedulerRunning()) {
+                if (!scheduler->getGeneratingProcesses()) {
+                    cout << "Scheduler is already stopped.\n";
+                }
+                else {
+                    cout << "Stopping scheduler...\n";
+                    scheduler->setGeneratingProcesses(false);
+                }
+            }
+            else {
                 cout << "Scheduler is not running.\n";
-                return;
             }
-            cout << "Stopping scheduler...\n";
-            Scheduler::getInstance()->stop();
-            if (Kernel::getInstance()->getSchedulerThread().joinable()) {
-                Kernel::getInstance()->getSchedulerThread().join();
-            }
-            cout << "Scheduler stopped successfully." << endl;
         }
         else if (command == "report-util") {
             auto allScreens = ScreenManager::getInstance()->getAllScreens();
@@ -308,4 +317,10 @@ void CommandInputController::commandHandler(string command) {
         }
     } 
 
+}
+
+void CommandInputController::startInputLoop() {
+    while (Kernel::getInstance()->getRunningStatus()) {
+        handleInputEntry(); // Your existing function already has the logic
+    }
 }

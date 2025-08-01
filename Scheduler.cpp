@@ -2,6 +2,7 @@
 #include "ScreenManager.h"
 #include "CLIController.h"
 #include "Instruction.h"
+#include "MemoryManager.h"
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -43,16 +44,23 @@ string Scheduler::getAlgorithm() const { return algorithm; }
 void Scheduler::addProcessToQueue(shared_ptr<Screen> screen) {
     lock_guard<mutex> lock(processQueueMutex);
     processQueue.push(screen);
+    //cout << "DEBUG: Process '" << screen->getName() << "' added to queue. Queue size is now: "
+    //    << processQueue.size() << endl;
+
     processQueueCondition.notify_one();
 }
 
 void Scheduler::start() {
     if (schedulerRunning) return;
     schedulerRunning.store(true);
+    generatingProcesses.store(false);
 
+    MemoryManager::initialize(maxOverallMem);
     workerThreads.clear();
 
-    processGeneratorThread = thread(&Scheduler::generateDummyProcesses, this);
+    // The process generator thread will start, but will be idle
+    // until generatingProcesses is set to true.
+    //processGeneratorThread = thread(&Scheduler::generateDummyProcesses, this);
 
 
     for (int i = 0; i < numCores; i++) {
@@ -64,7 +72,8 @@ void Scheduler::start() {
                     this->processQueueCondition.wait(lock, [this]() {
                         return !this->processQueue.empty() || !this->schedulerRunning;
                         });
-					
+                    //cout << "DEBUG: Worker thread " << i << " AWAKE. Checking queue..." << endl;
+
                     if (!this->schedulerRunning) return;
                     if (this->processQueue.empty()) continue;
 
@@ -73,26 +82,72 @@ void Scheduler::start() {
                 }
 
                 if (process) {
-                    coresUsed++; //increase if being used
-                    process->setCoreID(i);
-                    if (algorithm == "rr") {
-                        process->execute(quantumCycles);
-                        if (!process->isFinished()) {
+                    // Check if the process needs memory allocated.
+                    bool isInMemory = MemoryManager::getInstance()->isAllocated(process->getName());
+
+                    if (!isInMemory) {
+                        // If not in memory, try to allocate it.
+                        if (!MemoryManager::getInstance()->allocate(process->getName(), memPerProc)) {
+                            // Failed to get memory. Put it at the back of the queue and wait.
                             addProcessToQueue(process);
+                            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                            continue; // Let this thread try another process.
                         }
                     }
-                    else { //default fcfs
-                        process->execute();
+
+                    // --- If we reach here, the process is guaranteed to be in memory ---
+
+                    // A core is now being used to execute it.
+                    coresUsed++;
+                    process->setCoreID(i);
+
+                    // Execute for a quantum (RR) or to completion (FCFS).
+                    process->execute(algorithm == "rr" ? quantumCycles : -1);
+
+                    // This core is now free for another task.
+                    coresUsed--;
+
+                    // --- Post-execution clean-up ---
+                    if (process->isFinished()) {
+                        // If finished, free its memory.
+                        MemoryManager::getInstance()->deallocate(process->getName());
                     }
-                    coresUsed--; //decerement if finished
+                    else {
+                        // If not finished (must be RR), put it back in the queue for its next turn.
+                        addProcessToQueue(process);
+                    }
                 }
-                cpuCycles++;
             }
         });
     }
 }
 
+void Scheduler::startProcessGeneration() {
+    if (getGeneratingProcesses()) return; // Already running
+    setGeneratingProcesses(true);
+
+    // --- FIX: Add this block ---
+    // Generate an initial batch of processes immediately to kickstart the cycle.
+    // This gives the worker threads something to do and breaks the deadlock.
+    //cout << "Generating initial batch of processes..." << endl;
+    int initialBatchSize = numCores > 0 ? numCores : 1; // Ensure at least 1 process
+    for (int i = 0; i < initialBatchSize; ++i) {
+        auto screenName = "p" + to_string(generatedProcessCount++);
+        auto instructions = generateInstructionsForProcess(screenName);
+        auto screen = make_shared<Screen>(screenName, instructions, CLIController::getInstance()->getTimestamp());
+        ScreenManager::getInstance()->registerScreen(screenName, screen);
+        addProcessToQueue(screen); // Add directly to the queue
+    }
+    // --- End of fix ---
+
+    // Start the thread for continuous, ongoing generation.
+    if (!processGeneratorThread.joinable()) {
+        processGeneratorThread = thread(&Scheduler::generateDummyProcesses, this);
+    }
+}
+
 void Scheduler::stop() {
+    generatingProcesses.store(false);
     schedulerRunning.store(false);
     processQueueCondition.notify_all();
 
@@ -108,15 +163,15 @@ void Scheduler::stop() {
     cout << "Scheduler has finished joining all its threads." << endl;
 }
 
-void Scheduler::generateDummyProcesses() {
-    int batch = 0;
+std::vector<Instruction> Scheduler::generateInstructionsForProcess(const std::string& screenName) {
+    // --- Random number generators ---
     random_device rd;
     mt19937 gen(rd());
-    uniform_int_distribution<> instr_dist(minInstructions, maxInstructions); 
+    uniform_int_distribution<> instr_dist(minInstructions, maxInstructions);
     uniform_int_distribution<> value_dist(1, 100);
     uniform_int_distribution<> type_dist(0, 4);
 
-	//generate a random instruction (excluding FOR)
+    // --- Lambda to generate a single random instruction (excluding FOR) ---
     auto generateRandomInstruction = [&](const string& screenName) -> Instruction {
         InstructionType type = static_cast<InstructionType>(type_dist(gen));
         switch (type) {
@@ -131,25 +186,22 @@ void Scheduler::generateDummyProcesses() {
         default:
             return { InstructionType::PRINT, {}, "Hello world from " + screenName + "!" };
         }
-    };
+        };
 
-    //generate a FOR loop with nested instructions-(max 3)
+    // --- Lambda to generate a FOR loop with nested instructions (max 3 levels) ---
     function<void(int, vector<Instruction>&, int&, int)> generateForInstruction;
     generateForInstruction = [&](int nestLevel, vector<Instruction>& instructions, int& currentCount, int maxCount) {
-        if (currentCount >= maxCount || nestLevel > 3) return;//maximum of 3 nest levels only
+        if (currentCount >= maxCount || nestLevel > 3) return;
 
-        //ensure there's enough space for the FOR instruction itself and at least one inner instruction.
         if (currentCount + 2 > maxCount) return;
 
         int repeats = value_dist(gen) % 4 + 2; // 2-5 repeats
         int innerCount = value_dist(gen) % 3 + 2; // 2-4 inner instructions
         vector<Instruction> innerInstructions;
-
-        int tempInstructionCount = 0; //use a temporary counter for inner instructions
+        int tempInstructionCount = 0;
 
         for (int j = 0; j < innerCount && (currentCount + tempInstructionCount < maxCount); ++j) {
             if (nestLevel < 3 && value_dist(gen) % 4 == 0) {
-                //pass innerInstructions to the recursive call
                 generateForInstruction(nestLevel + 1, innerInstructions, tempInstructionCount, innerCount);
             }
             else {
@@ -158,56 +210,138 @@ void Scheduler::generateDummyProcesses() {
             }
         }
 
-        //only add the FOR instruction if it contains inner instructions
         if (!innerInstructions.empty()) {
             Instruction forInstr = { InstructionType::FOR, {{false, "", (uint16_t)repeats}}, "", innerInstructions };
-            instructions.push_back(forInstr); //add it
-            currentCount += tempInstructionCount + 1; //update main counter
+            instructions.push_back(forInstr);
+            currentCount += tempInstructionCount + 1;
         }
-    };
+        };
 
-	//generate a process with random instructions
-    auto generateProcess = [&](const string& screenName) {
-        vector<Instruction> instructions;
-        int num_instructions = instr_dist(gen);
-        int currentCount = 0;
-        instructions.push_back({ InstructionType::DECLARE, {{true, "x", 0}, {false, "", (uint16_t)value_dist(gen)}}, "" });
-        currentCount++;
+    // --- Main logic to generate the full set of instructions ---
+    vector<Instruction> instructions;
+    int num_instructions = instr_dist(gen);
+    int currentCount = 0;
+    instructions.push_back({ InstructionType::DECLARE, {{true, "x", 0}, {false, "", (uint16_t)value_dist(gen)}}, "" });
+    currentCount++;
 
-        for (int i = 0; i < num_instructions && currentCount < maxInstructions; ++i) {
-            if (i > 0 && value_dist(gen) % 5 == 0) {
-                generateForInstruction(1, instructions, currentCount, maxInstructions);
-            } else {
-                if (currentCount < maxInstructions) {
-                    instructions.push_back(generateRandomInstruction(screenName));
-                    currentCount++;
-                }
+    for (int i = 0; i < num_instructions && currentCount < maxInstructions; ++i) {
+        if (i > 0 && value_dist(gen) % 5 == 0) {
+            generateForInstruction(1, instructions, currentCount, maxInstructions);
+        }
+        else {
+            if (currentCount < maxInstructions) {
+                instructions.push_back(generateRandomInstruction(screenName));
+                currentCount++;
             }
         }
-        return instructions;
-    };
-
-    int initialBatchSize = numCores; //start with batch equal number to cores
-    for (int i = 0; i < initialBatchSize; ++i) {
-        auto screenName = "p" + to_string(batch++);
-        auto instructions = generateProcess(screenName);
-        auto screen = make_shared<Screen>(screenName, instructions, CLIController::getInstance()->getTimestamp());
-        ScreenManager::getInstance()->registerScreen(screenName, screen);
-        addProcessToQueue(screen);
     }
+    return instructions;
+}
 
-    while (schedulerRunning) {
-        if (cpuCycles - lastGenCycle < batchProcessFreq) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            continue;
+void Scheduler::generateDummyProcesses() {
+ //   int batch = 0;
+ //   random_device rd;
+ //   mt19937 gen(rd());
+ //   uniform_int_distribution<> instr_dist(minInstructions, maxInstructions); 
+ //   uniform_int_distribution<> value_dist(1, 100);
+ //   uniform_int_distribution<> type_dist(0, 4);
+
+	////generate a random instruction (excluding FOR)
+ //   auto generateRandomInstruction = [&](const string& screenName) -> Instruction {
+ //       InstructionType type = static_cast<InstructionType>(type_dist(gen));
+ //       switch (type) {
+ //       case InstructionType::ADD:
+ //           return { InstructionType::ADD, {{true, "x", 0}, {true, "x", 0}, {false, "", (uint16_t)value_dist(gen)}}, "" };
+ //       case InstructionType::SUBTRACT:
+ //           return { InstructionType::SUBTRACT, {{true, "x", 0}, {true, "x", 0}, {false, "", (uint16_t)(value_dist(gen) % 50)}}, "" };
+ //       case InstructionType::PRINT:
+ //           return { InstructionType::PRINT, {{true, "x", 0}}, "Value from " + screenName + ": %x%!" };
+ //       case InstructionType::SLEEP:
+ //           return { InstructionType::SLEEP, {{false, "", (uint16_t)(value_dist(gen) % 20 + 10)}}, "" };
+ //       default:
+ //           return { InstructionType::PRINT, {}, "Hello world from " + screenName + "!" };
+ //       }
+ //   };
+
+ //   //generate a FOR loop with nested instructions-(max 3)
+ //   function<void(int, vector<Instruction>&, int&, int)> generateForInstruction;
+ //   generateForInstruction = [&](int nestLevel, vector<Instruction>& instructions, int& currentCount, int maxCount) {
+ //       if (currentCount >= maxCount || nestLevel > 3) return;//maximum of 3 nest levels only
+
+ //       //ensure there's enough space for the FOR instruction itself and at least one inner instruction.
+ //       if (currentCount + 2 > maxCount) return;
+
+ //       int repeats = value_dist(gen) % 4 + 2; // 2-5 repeats
+ //       int innerCount = value_dist(gen) % 3 + 2; // 2-4 inner instructions
+ //       vector<Instruction> innerInstructions;
+
+ //       int tempInstructionCount = 0; //use a temporary counter for inner instructions
+
+ //       for (int j = 0; j < innerCount && (currentCount + tempInstructionCount < maxCount); ++j) {
+ //           if (nestLevel < 3 && value_dist(gen) % 4 == 0) {
+ //               //pass innerInstructions to the recursive call
+ //               generateForInstruction(nestLevel + 1, innerInstructions, tempInstructionCount, innerCount);
+ //           }
+ //           else {
+ //               innerInstructions.push_back(generateRandomInstruction("FOR"));
+ //               tempInstructionCount++;
+ //           }
+ //       }
+
+ //       //only add the FOR instruction if it contains inner instructions
+ //       if (!innerInstructions.empty()) {
+ //           Instruction forInstr = { InstructionType::FOR, {{false, "", (uint16_t)repeats}}, "", innerInstructions };
+ //           instructions.push_back(forInstr); //add it
+ //           currentCount += tempInstructionCount + 1; //update main counter
+ //       }
+ //   };
+
+	////generate a process with random instructions
+ //   auto generateProcess = [&](const string& screenName) {
+ //       vector<Instruction> instructions;
+ //       int num_instructions = instr_dist(gen);
+ //       int currentCount = 0;
+ //       instructions.push_back({ InstructionType::DECLARE, {{true, "x", 0}, {false, "", (uint16_t)value_dist(gen)}}, "" });
+ //       currentCount++;
+
+ //       for (int i = 0; i < num_instructions && currentCount < maxInstructions; ++i) {
+ //           if (i > 0 && value_dist(gen) % 5 == 0) {
+ //               generateForInstruction(1, instructions, currentCount, maxInstructions);
+ //           } else {
+ //               if (currentCount < maxInstructions) {
+ //                   instructions.push_back(generateRandomInstruction(screenName));
+ //                   currentCount++;
+ //               }
+ //           }
+ //       }
+ //       return instructions;
+ //   };
+
+    //int initialBatchSize = numCores;
+    //for (int i = 0; i < initialBatchSize; ++i) {
+    //    auto screenName = "p" + to_string(generatedProcessCount++);
+    //    // Call the new reusable method
+    //    auto instructions = generateInstructionsForProcess(screenName);
+    //    auto screen = make_shared<Screen>(screenName, instructions, CLIController::getInstance()->getTimestamp());
+    //    ScreenManager::getInstance()->registerScreen(screenName, screen);
+    //    addProcessToQueue(screen);
+    //}
+    while (schedulerRunning.load()) {
+        // Only generate processes if the flag is set to true
+        if (generatingProcesses.load()) {
+            // Check if it's time to generate a new process based on frequency
+            if (cpuCycles - lastGenCycle >= batchProcessFreq) {
+                lastGenCycle = cpuCycles;
+
+                auto screenName = "p" + to_string(generatedProcessCount++);
+                auto instructions = generateInstructionsForProcess(screenName);
+                auto screen = make_shared<Screen>(screenName, instructions, CLIController::getInstance()->getTimestamp());
+                ScreenManager::getInstance()->registerScreen(screenName, screen);
+                addProcessToQueue(screen);
+            }
         }
-        lastGenCycle = cpuCycles;
-
-        auto screenName = "p" + to_string(batch++);
-        auto instructions = generateProcess(screenName);
-        auto screen = make_shared<Screen>(screenName, instructions, CLIController::getInstance()->getTimestamp());
-        ScreenManager::getInstance()->registerScreen(screenName, screen);
-        addProcessToQueue(screen);
+        // Sleep briefly to prevent the loop from consuming 100% CPU when idle
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
 
@@ -216,14 +350,17 @@ void Scheduler::loadConfig() {
     //error checker
     if (!config) {
         cerr << "Error: config.txt not found. Using default values." << endl;
-        numCores = 4;
+        numCores = 2;
         algorithm = "rr";
-        quantumCycles = 5;
+        quantumCycles = 4;
         batchProcessFreq = 1;
-        minInstructions = 1000;
-        maxInstructions = 2000;
-        delayPerExec = 0;
+        minInstructions = 100;
+        maxInstructions = 100;
+        delayPerExec = 1;
         coresAvailable = numCores;
+		maxOverallMem = 16384; //default 16MB
+		memPerFrame = 16; //default 16KB
+		memPerProc = 4096; //default 4KB
         return;
     }
 
@@ -271,17 +408,50 @@ void Scheduler::loadConfig() {
             delayPerExec = stoi(value);
             if (delayPerExec < 0) delayPerExec = 0;
         }
+        else if (key == "max-overall-mem") {
+            maxOverallMem = stoi(value);
+			if (maxOverallMem < 1) maxOverallMem = 1;
+        }
+        else if (key == "mem-per-frame") {
+            memPerFrame = stoi(value);
+			if (memPerFrame < 1) memPerFrame = 1;
+        }
+        else if (key == "mem-per-proc") {
+            memPerProc = stoi(value);
+			if (memPerProc < 1) memPerProc = 1;
+        }
     }
     //assign cores available
     coresAvailable = numCores;
 }
 
-int Scheduler::getUsedCores() const { return coresUsed; }
+int Scheduler::getUsedCores() const {
+    return coresUsed.load(); // Use .load() for explicit atomic read
+}
 int Scheduler::getAvailableCores() const { return coresAvailable; }
 int Scheduler::getIdleCpuTicks() { return idleCpuTicks; }
-int Scheduler::getCpuCycles() const { return cpuCycles; }
-void Scheduler::setCpuCycles(int cycles) { cpuCycles = cycles; }
+int Scheduler::getCpuCycles() const {
+    // FIX: Use .load() for atomic reads
+    return cpuCycles.load();
+}
+void Scheduler::setCpuCycles(int cycles) {
+    // FIX: Use .store() for atomic writes
+    cpuCycles.store(cycles);
+}
 int Scheduler::getDelayPerExec() const { return delayPerExec; }
 
+int Scheduler::getMemPerProc() const { return memPerProc; }
 bool Scheduler::getSchedulerRunning() const { return schedulerRunning.load(); }
 void Scheduler::setSchedulerRunning(bool val) { schedulerRunning.store(val); }
+void Scheduler::setGeneratingProcesses(bool shouldGenerate) {
+    generatingProcesses.store(shouldGenerate);
+}
+bool Scheduler::getGeneratingProcesses() {
+	return generatingProcesses.load();
+}
+void Scheduler::incrementCpuCycles() {
+    cpuCycles.fetch_add(1); 
+}
+int Scheduler::getQuantumCycles() const {
+    return quantumCycles;
+}

@@ -31,6 +31,7 @@
     <ClInclude Include="CommandInputController.h" />
     <ClInclude Include="Instruction.h" />
     <ClInclude Include="Kernel.h" />
+    <ClInclude Include="MemoryManager.h" />
     <ClInclude Include="Scheduler.h" />
     <ClInclude Include="Screen.h" />
     <ClInclude Include="ScreenManager.h" />
@@ -40,6 +41,7 @@
     <ClCompile Include="CommandInputController.cpp" />
     <ClCompile Include="Kernel.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MemoryManager.cpp" />
     <ClCompile Include="Scheduler.cpp" />
     <ClCompile Include="Screen.cpp" />
     <ClCompile Include="ScreenManager.cpp" />

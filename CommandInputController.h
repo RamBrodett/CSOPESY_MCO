@@ -12,7 +12,7 @@ public:
 	static void initialize();
 	static CommandInputController* getInstance();
 	static void destroy();
-
+	void startInputLoop();
 
 private:
 	static CommandInputController* instance;

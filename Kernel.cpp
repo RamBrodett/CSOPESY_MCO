@@ -5,6 +5,9 @@ Kernel* Kernel::instance = nullptr;
 
 Kernel::Kernel() {}
 
+Kernel::~Kernel() {//destructor 
+}
+
 void Kernel::initialize() {
 	if (!instance) instance = new Kernel();
 }
