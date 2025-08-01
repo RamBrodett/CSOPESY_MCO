@@ -181,20 +181,19 @@ void CommandInputController::commandHandler(string command) {
                     cout << "Usage: screen -r <name>\n";
                 }
                 else if (!ScreenManager::getInstance()->hasScreen(screenName)) {
-                    cout << "No such screen named '" << screenName << "'.\n";
+                    cout << "Process '" << screenName << "' not found.\n";
                 }
                 else {
 					auto screen = ScreenManager::getInstance()->getScreen(screenName);
 					if (screen->isFinished()) {
                         //check process if finished
-						cout << "Screen '" << screenName << "' has already finished execution.\n";
+						cout << "Process '" << screenName << "' not found.\n";
 					}
 					else {
                         //change screen if not finished
                         ScreenManager::getInstance()->switchScreen(screenName);
                         CLIController::getInstance()->clearScreen();
 					}
-
                 }
             }
             else {
