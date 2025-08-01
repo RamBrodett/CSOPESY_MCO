@@ -173,8 +173,31 @@ std::vector<Instruction> Scheduler::generateInstructionsForProcess(const std::st
 
     // --- Lambda to generate a single random instruction (excluding FOR) ---
     auto generateRandomInstruction = [&](const string& screenName) -> Instruction {
+        uniform_int_distribution<> type_dist(0, 6); // Include READ/WRITE
         InstructionType type = static_cast<InstructionType>(type_dist(gen));
         switch (type) {
+        case InstructionType::READ: {
+            // Generate memory address - some will be invalid to trigger violations
+            uniform_int_distribution<> addr_dist(0x800, 0x3000); // Range that may exceed process bounds
+            uint16_t address = addr_dist(gen);
+
+            Instruction readInstr;
+            readInstr.type = InstructionType::READ;
+            readInstr.operands = { {true, "var_" + to_string(value_dist(gen) % 10), 0} };
+            readInstr.memoryAddress = address;
+            return readInstr;
+        }
+        case InstructionType::WRITE: {
+            // Generate memory address - some will be invalid to trigger violations
+            uniform_int_distribution<> addr_dist(0x800, 0x3000); // Range that may exceed process bounds
+            uint16_t address = addr_dist(gen);
+
+            Instruction writeInstr;
+            writeInstr.type = InstructionType::WRITE;
+            writeInstr.operands = { {false, "", (uint16_t)value_dist(gen)} };
+            writeInstr.memoryAddress = address;
+            return writeInstr;
+        }
         case InstructionType::ADD:
             return { InstructionType::ADD, {{true, "x", 0}, {true, "x", 0}, {false, "", (uint16_t)value_dist(gen)}}, "" };
         case InstructionType::SUBTRACT:

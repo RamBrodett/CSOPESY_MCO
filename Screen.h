@@ -42,12 +42,32 @@ public:
     //if -1, then it is not round robin
     void execute(int quantum = -1); 
 
+    // Add memory violation tracking
+    bool hasMemoryViolation() const;
+    std::string getMemoryViolationAddress() const;
+    std::string getMemoryViolationTime() const;
+
+    // Symbol table management (64 bytes = 32 variables max)
+    bool canDeclareVariable() const;
+    int getVariableCount() const;
+
 private:
     // Helper methods
     uint16_t getOperandValue(const Operand& op);
     void setVariableValue(const std::string& name, uint16_t value);
     void addOutput(const std::string& message);
     void executeInstructionList(const std::vector<Instruction>& instructionList);
+
+    // Memory violation tracking
+    bool memoryViolationOccurred;
+    std::string memoryViolationAddress;
+    std::string memoryViolationTime;
+
+    // Symbol table limit (32 variables max)
+    static const int MAX_VARIABLES = 32;
+
+    // Helper method for handling violations
+    void triggerMemoryViolation(uint16_t address);
 
     // --- Member variables ---
     std::string name;

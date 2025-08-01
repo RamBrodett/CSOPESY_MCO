@@ -11,14 +11,15 @@
 #include "Scheduler.h"
 using namespace std;
 // Corrected Constructor to match header declaration order
-Screen::Screen(string name, std::vector<Instruction> instructions, string timestamp)
-    : name(name), instructions(instructions), timestamp(timestamp), programCounter(0),
-    cpuCoreID(-1), isRunning(false) {
-}
 
 Screen::Screen()
     : name(""), instructions({}), timestamp(CLIController::getInstance()->getTimestamp()),
-    programCounter(0), cpuCoreID(-1), isRunning(false) {
+    programCounter(0), cpuCoreID(-1), isRunning(false), memoryViolationOccurred(false) {
+}
+
+Screen::Screen(string name, std::vector<Instruction> instructions, string timestamp)
+    : name(name), instructions(instructions), timestamp(timestamp), programCounter(0),
+    cpuCoreID(-1), isRunning(false), memoryViolationOccurred(false) {
 }
 
 // --- Getters (definitions match the corrected header) ---
@@ -29,7 +30,9 @@ string Screen::getTimestamp() const { return timestamp; }
 string Screen::getTimestampFinished() const { return timestampFinished; }
 int Screen::getCoreID() const { return cpuCoreID; }
 bool Screen::getIsRunning() const { return isRunning; }
-bool Screen::isFinished() const { return programCounter >= getTotalInstructions(); }
+bool Screen::isFinished() const {
+    return programCounter >= getTotalInstructions() || hasMemoryViolation();
+}
 std::vector<std::string> Screen::getOutputBuffer() const {
     std::lock_guard<std::mutex> lock(outputMutex);
     return outputBuffer;
@@ -75,6 +78,9 @@ void Screen::setVariableValue(const std::string& name, uint16_t value) {
 
 void Screen::executeInstructionList(const std::vector<Instruction>& instructionList) {
     for (const auto& instruction : instructionList) {
+
+        if (hasMemoryViolation()) return;
+
         // --- Busy-wait delay ---
         int delay = Scheduler::getInstance()->getDelayPerExec();
         if (delay > 0) {
@@ -84,7 +90,9 @@ void Screen::executeInstructionList(const std::vector<Instruction>& instructionL
         switch (instruction.type) {
             // Note: No 'programCounter++' here, as this is for inner loops
         case InstructionType::DECLARE:
-            setVariableValue(instruction.operands[0].variableName, getOperandValue(instruction.operands[1]));
+            if (canDeclareVariable()) {
+                setVariableValue(instruction.operands[0].variableName, getOperandValue(instruction.operands[1]));
+            }
             break;
         case InstructionType::ADD:
             setVariableValue(instruction.operands[0].variableName, getOperandValue(instruction.operands[1]) + getOperandValue(instruction.operands[2]));
@@ -107,6 +115,31 @@ void Screen::executeInstructionList(const std::vector<Instruction>& instructionL
             addOutput(formattedLog);
             break;
         }
+        case InstructionType::READ: {
+            uint16_t address = instruction.memoryAddress;
+            uint16_t value;
+            if (MemoryManager::getInstance()->readMemory(name, address, value)) {
+                if (canDeclareVariable() || variables.find(instruction.operands[0].variableName) != variables.end()) {
+                    setVariableValue(instruction.operands[0].variableName, value);
+                }
+            }
+            else {
+                triggerMemoryViolation(address);
+                return;
+            }
+            break;
+        }
+        case InstructionType::WRITE: {
+            uint16_t address = instruction.memoryAddress;
+            uint16_t value = getOperandValue(instruction.operands[0]);
+
+            if (!MemoryManager::getInstance()->writeMemory(name, address, value)) {
+                triggerMemoryViolation(address);
+                return;
+            }
+            break;
+        }
+
         case InstructionType::SLEEP:
             this_thread::sleep_for(chrono::milliseconds(getOperandValue(instruction.operands[0])));
             break;
@@ -168,3 +201,35 @@ void Screen::execute(int quantum) {
         setIsRunning(false);
     }
 };
+
+bool Screen::hasMemoryViolation() const {
+    return memoryViolationOccurred;
+}
+
+std::string Screen::getMemoryViolationAddress() const {
+    return memoryViolationAddress;
+}
+
+std::string Screen::getMemoryViolationTime() const {
+    return memoryViolationTime;
+}
+
+bool Screen::canDeclareVariable() const {
+    return variables.size() < MAX_VARIABLES;
+}
+
+int Screen::getVariableCount() const {
+    return static_cast<int>(variables.size());
+}
+
+void Screen::triggerMemoryViolation(uint16_t address) {
+    stringstream ss;
+    ss << "0x" << hex << uppercase << address;
+    memoryViolationAddress = ss.str();
+    memoryViolationTime = CLIController::getInstance()->getTimestamp();
+    memoryViolationOccurred = true;
+    setTimestampFinished(memoryViolationTime);
+    setIsRunning(false);
+}
+
+

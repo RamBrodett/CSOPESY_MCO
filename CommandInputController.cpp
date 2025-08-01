@@ -107,7 +107,22 @@ void CommandInputController::commandHandler(string command) {
                 for (const auto& pair : allScreens) {
                     if (pair.first == "main") continue;
                     auto screen = pair.second;
-                    if (screen->getProgramCounter() >= screen->getTotalInstructions() && screen->getTotalInstructions() > 0) {
+
+                    if (screen->hasMemoryViolation()) {
+                        // Extract time from timestamp
+                        string timeOnly = screen->getMemoryViolationTime();
+                        size_t timeStart = timeOnly.find(", ") + 2;
+                        size_t timeEnd = timeOnly.find(" ", timeStart);
+                        if (timeEnd != string::npos) {
+                            timeOnly = timeOnly.substr(timeStart, timeEnd - timeStart);
+                        }
+
+                        cout << "Process " << screen->getName()
+                            << " shut down due to memory access violation error that occurred at "
+                            << timeOnly << ". " << screen->getMemoryViolationAddress()
+                            << " invalid." << endl;
+                    }
+                    else if (screen->isFinished()) {
                         finishedProcesses.push_back(screen);
                     }
                     else {
