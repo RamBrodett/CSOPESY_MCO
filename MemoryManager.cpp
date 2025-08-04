@@ -5,32 +5,34 @@
 #include <sstream>
 #include <iomanip>
 #include <numeric>
+using namespace std;
 
-
+// --- Singleton & Mutex ---
 MemoryManager* MemoryManager::instance = nullptr;
-std::mutex MemoryManager::mutex_;
+mutex MemoryManager::mutex_;
 
+// Initializes the MemoryManager singleton with total memory and frame size details
 void MemoryManager::initialize(int totalMemory, int frameSize) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    lock_guard<mutex> lock(mutex_);
     if (!instance) {
         instance = new MemoryManager(totalMemory, frameSize);
     }
 }
 
+// Returns the singleton instance of the MemoryManager.
 MemoryManager* MemoryManager::getInstance() {
     return instance;
 }
 
+// Destroys the singleton instance to free memory.
 void MemoryManager::destroy() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    lock_guard<mutex> lock(mutex_);
     delete instance;
     instance = nullptr;
 }
 
-//MemoryManager::MemoryManager(int totalMemory) : totalMemory(totalMemory) {
-//    memoryMap.push_back({ "free", 0, totalMemory });
-//}
-// Constructor
+
+// Constructor: sets up the physical memory emulation, frame table, and free list.
 MemoryManager::MemoryManager(int totalMemory, int frameSize)
     : totalMemory(totalMemory), frameSize(frameSize) {
     numFrames = totalMemory / frameSize;
@@ -41,54 +43,26 @@ MemoryManager::MemoryManager(int totalMemory, int frameSize)
         free_frame_list.push_back(i);
     }
     // Clear the backing store on startup
-    std::ofstream("csopesy-backing-store.txt", std::ios::trunc).close();
+    ofstream("csopesy-backing-store.txt", ios::trunc).close();
 }
 
-
-bool MemoryManager::setupProcessMemory(const std::string& processId, int size) {
-    std::lock_guard<std::mutex> lock(memory_mutex_);
+// Creates the initial page table for a new process based on its required memory size.
+bool MemoryManager::setupProcessMemory(const string& processId, int size) {
+    lock_guard<std::mutex> lock(memory_mutex_);
     int num_pages_required = (size + frameSize - 1) / frameSize; // Ceiling division
 
     process_page_tables[processId] = PageTable(num_pages_required);
     return true;
 }
 
-
-//// Allocates a block of memory using the first-fit algorithm(for now).
-//bool MemoryManager::allocate(const std::string& processId, int size) {
-//    std::lock_guard<std::mutex> lock(mapMutex_);
-//
-//    /** this is the logic guys for further development
-//    * Iterate through the memory map to find the first available free block
-//    * that is large enough to accommodate the requested size. If a suitable
-//    * block is found, it is assigned to the process. If the block is larger
-//    * than required, it is split into an allocated block and a new free block.
-//    */
-//
-//    for (auto it = memoryMap.begin(); it != memoryMap.end(); ++it) {
-//        if (it->processId == "free" && it->size >= size) {
-//            int remainingSize = it->size - size;
-//            it->size = size;
-//            it->processId = processId;
-//
-//            if (remainingSize > 0) {
-//                memoryMap.insert(it + 1, { "free", it->startAddress + size, remainingSize });
-//            }
-//            return true;
-//        }
-//    }
-//    return false; // No suitable block found
-//}
-
+// Releases all memory frames allocated to a specific process.
 void MemoryManager::deallocate(const std::string& processId) {
     std::lock_guard<std::mutex> lock(memory_mutex_);
     if (process_page_tables.find(processId) == process_page_tables.end()) return;
 
+    // Iterate the process's page table and release each valid frame.
     for (const auto& pte : process_page_tables.at(processId)) {
         if (pte.valid) {
-            // ==============================================================================
-            // CHANGE: Corrected member access from snake_case to camelCase.
-            // ==============================================================================
             int frame_num = pte.frameNumber;
             frame_table[frame_num].allocated = false;
             frame_table[frame_num].processId = "";
@@ -98,27 +72,10 @@ void MemoryManager::deallocate(const std::string& processId) {
     }
     process_page_tables.erase(processId);
 }
-//// Merges adjacent free memory blocks to reduce fragmentation.
-//void MemoryManager::mergeFreeBlocks() {
-//    if (memoryMap.size() < 2) return;
-//    // iterate through the memory map and merge adjacent free blocks
-//    for (auto it = memoryMap.begin(); it != memoryMap.end() - 1; ) {
-//        auto next_it = it + 1;
-//        if (it->processId == "free" && next_it->processId == "free") {
-//            it->size += next_it->size;
-//            memoryMap.erase(next_it);
-//        }
-//        else {
-//            ++it;
-//        }
-//    }
-//}
 
-// ==============================================================================
-// CHANGE: 'readMemory' and 'writeMemory' now perform logical-to-physical
-// address translation and trigger page faults if a page is not resident.
-// ==============================================================================
-bool MemoryManager::readMemory(const std::string& processId, uint16_t address, uint16_t& value) {
+
+// Reads a value from a process's logical memory; triggers a page fault if needed.
+bool MemoryManager::readMemory(const string& processId, uint16_t address, uint16_t& value) {
     std::lock_guard<std::mutex> lock(memory_mutex_);
     if (process_page_tables.find(processId) == process_page_tables.end()) return false;
 
@@ -137,6 +94,7 @@ bool MemoryManager::readMemory(const std::string& processId, uint16_t address, u
     return true;
 }
 
+// Writes a value to a process's logical memory; triggers a page fault if needed.
 bool MemoryManager::writeMemory(const std::string& processId, uint16_t address, uint16_t value) {
     std::lock_guard<std::mutex> lock(memory_mutex_);
     if (process_page_tables.find(processId) == process_page_tables.end()) return false;
@@ -158,6 +116,7 @@ bool MemoryManager::writeMemory(const std::string& processId, uint16_t address, 
     return true;
 }
 
+// Handles a page fault by finding a frame, evicting if necessary, and loading the required page.
 int MemoryManager::handlePageFault(const std::string& processId, int pageNumber) {
     int target_frame;
 
@@ -172,17 +131,9 @@ int MemoryManager::handlePageFault(const std::string& processId, int pageNumber)
         // Check if the victim frame is actually associated with a process
         if (process_page_tables.count(victim_frame_info.processId)) {
             auto& victim_pte = process_page_tables.at(victim_frame_info.processId)[victim_frame_info.pageNumber];
-
-            // ==debugger==
-            //std::cout << "[DEBUG] Evicting Frame " << target_frame
-            //<< " (Owned by: " << victim_frame_info.processId
-            //<< ", Page: " << victim_frame_info.pageNumber
-            //<< ", Dirty: " << (victim_pte.dirty ? "Yes" : "No") << ")" << std::endl;
-            //// ==============================================================================
-
             if (victim_pte.dirty) {
                 writePageToBackingStore(target_frame);
-                pages_paged_out++; // This will now be correctly incremented
+                pages_paged_out++;
             }
             victim_pte.valid = false;
             victim_pte.frameNumber = -1;
@@ -190,15 +141,9 @@ int MemoryManager::handlePageFault(const std::string& processId, int pageNumber)
     }
 
     readPageFromBackingStore(processId, pageNumber, target_frame);
-    pages_paged_in++; // This will now be correctly incremented
+    pages_paged_in++; 
 
-    // ==============================================================================
-    // THE FIX: Change 'false' to 'true' to mark the frame as allocated.
-    // ==============================================================================
-    frame_table[target_frame] = { true, processId, pageNumber }; // Set allocated to TRUE
-
-    // Update the process's page table to reflect the new, valid page
-    //process_page_tables.at(processId)[pageNumber] = { target_frame, true, false };
+    frame_table[target_frame] = { true, processId, pageNumber }; 
     auto& pte = process_page_tables.at(processId)[pageNumber];
     pte.frameNumber = target_frame;
     pte.valid = true;
@@ -207,14 +152,15 @@ int MemoryManager::handlePageFault(const std::string& processId, int pageNumber)
     return target_frame;
 }
 
+// Selects a victim frame to be replaced using a simple FIFO algorithm.
 int MemoryManager::findVictimFrame() {
-    // Simple FIFO: the first frame allocated is the first to be replaced.
     static int next_victim_frame = 0;
     int victim = next_victim_frame;
     next_victim_frame = (next_victim_frame + 1) % numFrames;
     return victim;
 }
 
+// Writes the content of a frame to the backing store file.
 void MemoryManager::writePageToBackingStore(int frameNumber) {
     fstream file("csopesy-backing-store.txt", ios::in | ios::out | ios::binary);
     if (!file) {
@@ -225,6 +171,7 @@ void MemoryManager::writePageToBackingStore(int frameNumber) {
     file.write(reinterpret_cast<const char*>(&physical_memory[physical_address]), frameSize);
 }
 
+// Reads a page for a process from the backing store into a specified frame.
 void MemoryManager::readPageFromBackingStore(const std::string& processId, int pageNumber, int frameNumber) {
     fstream file("csopesy-backing-store.txt", ios::in | ios::binary);
     int physical_address = (frameNumber * frameSize) / sizeof(uint16_t);
@@ -243,17 +190,18 @@ void MemoryManager::readPageFromBackingStore(const std::string& processId, int p
     }
 }
 
-// ==============================================================================
-// CHANGE: Added getter functions to provide stats to ScreenManager.
-// ==============================================================================
+
+// Returns the total configured memory of the system.
 int MemoryManager::getTotalMemory() const {
     return totalMemory;
 }
 
+// Returns the current amount of used memory in bytes.
 int MemoryManager::getUsedMemory() const {
     return (numFrames - static_cast<int>(free_frame_list.size())) * frameSize;
 }
 
+// Returns the memory usage for a single process.
 int MemoryManager::getProcessMemoryUsage(const std::string& processId) const {
     if (process_page_tables.find(processId) == process_page_tables.end()) {
         return 0;
@@ -267,28 +215,19 @@ int MemoryManager::getProcessMemoryUsage(const std::string& processId) const {
     return valid_pages * frameSize;
 }
 
+// Returns the total count of pages paged in from the backing store.
 int MemoryManager::getPagedInCount() const {
     return pages_paged_in.load();
 }
 
+// Returns the total count of pages paged out to the backing store.
 int MemoryManager::getPagedOutCount() const {
     return pages_paged_out.load();
 }
 
-
-//int MemoryManager::getFragmentation() const {
-//    //std::lock_guard<std::mutex> lock(mapMutex_);
-//    int freeMemory = 0;
-//    for (const auto& block : memoryMap) {
-//        if (block.processId == "free") {
-//            freeMemory += block.size;
-//        }
-//    }
-//    return freeMemory;
-//}
-
+// Prints the current status of the frame table for debugging.
 void MemoryManager::printFrameTable() const {
-    std::lock_guard<std::mutex> lock(memory_mutex_);
+    lock_guard<std::mutex> lock(memory_mutex_);
     cout << "--- Frame Table Status ---" << endl;
     cout << "Frame | Allocated | Process ID | Page Num" << endl;
     cout << "--------------------------" << endl;

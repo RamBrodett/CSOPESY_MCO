@@ -15,15 +15,17 @@
 
 using namespace std;
 
+// --- Singleton & Mutex ---
 Scheduler* Scheduler::scheduler = nullptr;
 std::mutex Scheduler::scheduler_init_mutex;
 
+// Constructor: initializes scheduler state variables.
 Scheduler::Scheduler()
     : numCores(0), coresUsed(0), coresAvailable(0),
     schedulerRunning(false), activeThreads(0) {
 }
 
-
+// Initializes the singleton instance of the Scheduler and loads its configuration.
 void Scheduler::initialize() {
     if (scheduler == nullptr) {
         lock_guard<mutex> lock(scheduler_init_mutex);
@@ -34,35 +36,32 @@ void Scheduler::initialize() {
     }
 }
 
+// Returns the singleton instance of the Scheduler.
 Scheduler* Scheduler::getInstance() {
     return scheduler;
 }
 
+
 void Scheduler::setAlgorithm(const string& algo) { algorithm = algo; }
 string Scheduler::getAlgorithm() const { return algorithm; }
 
+// Adds a process (screen) to the ready queue to be executed.
 void Scheduler::addProcessToQueue(shared_ptr<Screen> screen) {
     lock_guard<mutex> lock(processQueueMutex);
     processQueue.push(screen);
-    //cout << "DEBUG: Process '" << screen->getName() << "' added to queue. Queue size is now: "
-    //    << processQueue.size() << endl;
-
     processQueueCondition.notify_one();
 }
 
+// Starts the scheduler's worker threads to begin processing the queue.
 void Scheduler::start() {
     if (schedulerRunning) return;
     schedulerRunning.store(true);
     generatingProcesses.store(false);
 
+    // Initialize the memory manager with configured values.
     MemoryManager::initialize(maxOverallMem,memPerFrame);
+    // Create a pool of worker threads based on the number of CPU cores.
     workerThreads.clear();
-
-    // The process generator thread will start, but will be idle
-    // until generatingProcesses is set to true.
-    //processGeneratorThread = thread(&Scheduler::generateDummyProcesses, this);
-
-
     for (int i = 0; i < numCores; i++) {
         workerThreads.emplace_back([this, i]() {
             while (this->schedulerRunning) {
@@ -72,7 +71,7 @@ void Scheduler::start() {
                     this->processQueueCondition.wait(lock, [this]() {
                         return !this->processQueue.empty() || !this->schedulerRunning;
                         });
-                    //cout << "DEBUG: Worker thread " << i << " AWAKE. Checking queue..." << endl;
+                  
 
                     if (!this->schedulerRunning) return;
                     if (this->processQueue.empty()) continue;
@@ -82,32 +81,16 @@ void Scheduler::start() {
                 }
 
                 if (process) {
-                    //// Check if the process needs memory allocated.
-                    //bool isInMemory = MemoryManager::getInstance()->isAllocated(process->getName());
-
-                    //if (!isInMemory) {
-                    //    // If not in memory, try to allocate it.
-                    //    if (!MemoryManager::getInstance()->allocate(process->getName(), memPerProc)) {
-                    //        // Failed to get memory. Put it at the back of the queue and wait.
-                    //        addProcessToQueue(process);
-                    //        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                    //        continue; // Let this thread try another process.
-                    //    }
-                    //}
-
-                    // --- If we reach here, the process is guaranteed to be in memory ---
-
-                    // A core is now being used to execute it.
+                    
                     coresUsed++;
                     process->setCoreID(i);
 
                     // Execute for a quantum (RR) or to completion (FCFS).
                     process->execute(algorithm == "rr" ? quantumCycles : -1);
 
-                    // This core is now free for another task.
                     coresUsed--;
 
-                    // --- Post-execution clean-up ---
+                    // If process is finished, deallocate its memory. Otherwise, requeue it.
                     if (process->isFinished()) {
                         // If finished, free its memory.
                         MemoryManager::getInstance()->deallocate(process->getName());
@@ -122,6 +105,7 @@ void Scheduler::start() {
     }
 }
 
+// Starts the automatic generation of processes in a separate thread.
 void Scheduler::startProcessGeneration() {
     if (getGeneratingProcesses()) return; // Already running
     setGeneratingProcesses(true);
@@ -130,17 +114,12 @@ void Scheduler::startProcessGeneration() {
     for (int i = 0; i < initialBatchSize; ++i) {
         auto screenName = "p" + to_string(generatedProcessCount++);
 
-        // ==============================================================================
-        // CHANGE: Added memory allocation for automatically generated processes.
-        // ==============================================================================
-        // 1. Determine a random memory size for the new process.
-        int memSize = getRandomPowerOf2(minMemPerProc, maxMemPerProc);
+       int memSize = getRandomPowerOf2(minMemPerProc, maxMemPerProc);
 
-        // 2. Generate instructions and create the screen object.
+        // Generate instructions and create the screen object.
         auto instructions = generateInstructionsForProcess(screenName, memSize);
         auto screen = make_shared<Screen>(screenName, instructions, CLIController::getInstance()->getTimestamp());
 
-        // 3. Set up the process's memory space in the Memory Manager.
         MemoryManager::getInstance()->setupProcessMemory(screenName, memSize);
 
         ScreenManager::getInstance()->registerScreen(screenName, screen);
@@ -152,6 +131,7 @@ void Scheduler::startProcessGeneration() {
     }
 }
 
+// Stops the scheduler and joins all worker/generator threads.
 void Scheduler::stop() {
     generatingProcesses.store(false);
     schedulerRunning.store(false);
@@ -169,6 +149,7 @@ void Scheduler::stop() {
     cout << "Scheduler has finished joining all its threads." << endl;
 }
 
+// Generates a set of random instructions for a new process.
 std::vector<Instruction> Scheduler::generateInstructionsForProcess(const std::string& screenName, int processMemorySize) {
     // --- Random number generators ---
     static std::random_device rd;
@@ -180,10 +161,6 @@ std::vector<Instruction> Scheduler::generateInstructionsForProcess(const std::st
         uniform_int_distribution<> type_dist(0, 5);
         InstructionType type = static_cast<InstructionType>(type_dist(gen));
 
-        // ==============================================================================
-        // THE FIX: The address distribution now respects the process's memory size.
-        // ==============================================================================
-        // Ensure we don't try to create a distribution with a negative range if size is small
         int max_addr = (processMemorySize > 1) ? (processMemorySize - 1) : 0;
         uniform_int_distribution<> addr_dist(0, max_addr);
 
@@ -215,7 +192,7 @@ std::vector<Instruction> Scheduler::generateInstructionsForProcess(const std::st
             return { InstructionType::PRINT, {{true, "x", 0}}, "Value from " + screenName + ": %x%!" };
         }
     };
-    // --- Lambda to generate a FOR loop with nested instructions (max 3 levels) ---
+    // Lambda to generate a FOR loop with nested instructions (max 3 levels) 
     function<void(int, vector<Instruction>&, int&, int)> generateForInstruction;
     generateForInstruction = [&](int nestLevel, vector<Instruction>& instructions, int& currentCount, int maxCount) {
         if (currentCount >= maxCount || nestLevel > 3) return;
@@ -251,18 +228,6 @@ std::vector<Instruction> Scheduler::generateInstructionsForProcess(const std::st
     instructions.push_back({ InstructionType::DECLARE, {{true, "x", 0}, {false, "", (uint16_t)value_dist(gen)}}, "" });
     currentCount++;
 
-    // ==============================================================================
-// TEMPORARY TEST CODE: Force a WRITE to Page 10 , to check page out
-// ==============================================================================
-    //if (processMemorySize > 256 * 11) { // Ensure the process has enough memory for Page 10
-    //    uint16_t target_address = 256 * 10 + 5; // An address on Page 10
-    //    instructions.push_back({ InstructionType::WRITE, {{false, "", 999}}, "", {}, target_address });
-    //    currentCount++;
-    //} 
-    // ==============================================================================
-
-
-
     for (int i = 0; i < num_instructions && currentCount < maxInstructions; ++i) {
         if (i > 0 && value_dist(gen) % 5 == 0) {
             generateForInstruction(1, instructions, currentCount, maxInstructions);
@@ -277,6 +242,7 @@ std::vector<Instruction> Scheduler::generateInstructionsForProcess(const std::st
     return instructions;
 }
 
+// A loop that periodically creates new "dummy" processes for testing.
 void Scheduler::generateDummyProcesses() {
     while (schedulerRunning.load()) {
         if (generatingProcesses.load()) {
@@ -285,17 +251,11 @@ void Scheduler::generateDummyProcesses() {
 
                 auto screenName = "p" + to_string(generatedProcessCount++);
 
-                // ==============================================================================
-                // CHANGE: Added memory allocation for automatically generated processes.
-                // ==============================================================================
-                // 1. Determine a random memory size for the new process.
                 int memSize = getRandomPowerOf2(minMemPerProc, maxMemPerProc);
 
-                // 2. Generate instructions and create the screen object.
                 auto instructions = generateInstructionsForProcess(screenName, memSize);
                 auto screen = make_shared<Screen>(screenName, instructions, CLIController::getInstance()->getTimestamp());
 
-                // 3. Set up the process's memory space in the Memory Manager.
                 MemoryManager::getInstance()->setupProcessMemory(screenName, memSize);
 
                 ScreenManager::getInstance()->registerScreen(screenName, screen);
@@ -306,6 +266,7 @@ void Scheduler::generateDummyProcesses() {
     }
 }
 
+// Loads and parses configuration parameters from the "config.txt" file.
 void Scheduler::loadConfig() {
     ifstream config("config.txt");
     //error checker
@@ -378,10 +339,6 @@ void Scheduler::loadConfig() {
             memPerFrame = stoi(value);
 			if (memPerFrame < 1) memPerFrame = 1;
         }
-   //     else if (key == "mem-per-proc") {
-   //         memPerProc = stoi(value);
-			//if (memPerProc < 1) memPerProc = 1;
-   //     }
 		else if (key == "min-mem-per-proc") {
             minMemPerProc = stoi(value);
             if (minMemPerProc < 64) minMemPerProc = 64;
@@ -396,20 +353,18 @@ void Scheduler::loadConfig() {
 }
 
 int Scheduler::getUsedCores() const {
-    return coresUsed.load(); // Use .load() for explicit atomic read
+    return coresUsed.load(); 
 }
 int Scheduler::getAvailableCores() const { return coresAvailable; }
 int Scheduler::getCpuCycles() const {
-    // FIX: Use .load() for atomic reads
+    
     return cpuCycles.load();
 }
 void Scheduler::setCpuCycles(int cycles) {
-    // FIX: Use .store() for atomic writes
+    
     cpuCycles.store(cycles);
 }
 int Scheduler::getDelayPerExec() const { return delayPerExec; }
-
-//int Scheduler::getMemPerProc() const { return memPerProc; }
 bool Scheduler::getSchedulerRunning() const { return schedulerRunning.load(); }
 void Scheduler::setSchedulerRunning(bool val) { schedulerRunning.store(val); }
 void Scheduler::setGeneratingProcesses(bool shouldGenerate) {
@@ -435,11 +390,6 @@ int Scheduler::getRandomPowerOf2(int minVal, int maxVal) {
     }
     if (powers.empty()) return minVal;
 
-    // ==============================================================================
-    // CHANGE: The random number generator and distribution are now 'static'.
-    // This ensures they are initialized only ONCE and reuse their state, providing
-    // proper random values for each new process's memory size.
-    // ==============================================================================
     static std::random_device rd;
     static std::mt19937 gen(rd());
     std::uniform_int_distribution<> dist(0, static_cast<int>(powers.size() - 1));

@@ -16,17 +16,20 @@
 #include <chrono> 
 #include <random>
 #include <functional>
-
 using namespace std;
 
+// --- Singleton ---
 CommandInputController* CommandInputController::instance = nullptr;
 
+// Constructor (private for singleton pattern).
 CommandInputController::CommandInputController() {}
 
+// Initializes the singleton instance of the CommandInputController.
 void CommandInputController::initialize() {
     if (!instance) instance = new CommandInputController();
 }
 
+// Returns the singleton instance of the CommandInputController.
 CommandInputController* CommandInputController::getInstance() {
     return instance;
 }
@@ -34,7 +37,7 @@ CommandInputController* CommandInputController::getInstance() {
 
 vector<Instruction> parseInstructions(const string& input);
 
-// Helper to parse a single operand
+// Parses a single token into a variable or a literal value Operand.
 Operand parseOperand(const string& token) {
     if (isalpha(token[0])) { // It's a variable
         return { true, token, 0 };
@@ -44,12 +47,13 @@ Operand parseOperand(const string& token) {
     }
 }
 
+// Parses a string of semicolon-separated user commands into a vector of Instruction structs.
 vector<Instruction> parseInstructions(const string& input) {
     vector<Instruction> instructions;
     stringstream ss(input);
     string instructionSegment;
 
-    // Split the main string by semicolons
+    // Split the input string by semicolons to process each instruction.
     while (getline(ss, instructionSegment, ';')) {
         instructionSegment.erase(0, instructionSegment.find_first_not_of(" \t\n\r"));
         if (instructionSegment.empty()) continue;
@@ -61,6 +65,8 @@ vector<Instruction> parseInstructions(const string& input) {
         Instruction newInstruction;
         string token;
         vector<string> tokens;
+
+        // Parsing logic for DECLARE, ADD, WRITE, READ, PRINT etc.
         while (instrStream >> token) {
             tokens.push_back(token);
         }
@@ -94,9 +100,6 @@ vector<Instruction> parseInstructions(const string& input) {
             if (tokens.empty()) throw runtime_error("PRINT requires a message.");
             newInstruction.type = InstructionType::PRINT;
 
-            // ==============================================================================
-            // THE FIX: Reconstruct the message and search for a variable placeholder.
-            // ==============================================================================
             string message = tokens[0];
             for (size_t i = 1; i < tokens.size(); ++i) message += " " + tokens[i];
             newInstruction.printMessage = message;
@@ -122,7 +125,7 @@ vector<Instruction> parseInstructions(const string& input) {
 
 
 
-
+// Prompts the user, reads a line of input, and passes it to the command handler.
 void CommandInputController::handleInputEntry() {
     auto currentScreen = ScreenManager::getInstance()->getCurrentScreen();
 
@@ -136,11 +139,13 @@ void CommandInputController::handleInputEntry() {
     commandHandler(command);
 }
 
+// Destroys the singleton instance to free memory.
 void CommandInputController::destroy() {
     delete instance;
     instance = nullptr;
 }
 
+// The core command router; directs string commands to the appropriate functions.
 void CommandInputController::commandHandler(string command) {
     if (ScreenManager::getInstance()->getCurrentScreen()->getName() == "main") {
         if (command == "initialize") {
@@ -171,14 +176,7 @@ void CommandInputController::commandHandler(string command) {
             cout << "clear               : Clear the screen\n";
             cout << "exit                : Exit program\n";
         }
-        //else if (command == "debug-cycles") {
-        //    if (Scheduler::getInstance()) {
-        //        cout << "Current CPU Cycles: " << Scheduler::getInstance()->getCpuCycles() << endl;
-        //    }
-        //    else {
-        //        cout << "Scheduler not initialized." << endl;
-        //    }
-        //}
+      
         else if (command == "clear") {
             CLIController::getInstance()->clearScreen();
         }
@@ -302,14 +300,14 @@ void CommandInputController::commandHandler(string command) {
                 if (screenName.empty()) {
                     cout << "Usage: screen -r <name>\n";
                 }
-                // Step 1: Check if the screen name exists at all.
+                // Check if the screen name exists at all.
                 else if (!ScreenManager::getInstance()->hasScreen(screenName)) {
                     cout << "Process '" << screenName << "' not found.\n";
                 }
                 else {
                     auto screen = ScreenManager::getInstance()->getScreen(screenName);
 
-                    // Step 2: Check for a memory violation (MO2 Specification).
+                    // Check for a memory violation.
                     if (screen->hasMemoryViolation()) {
                         string timeOnly = screen->getMemoryViolationTime();
                         size_t timeStart = timeOnly.find(", ") + 2;
@@ -319,11 +317,6 @@ void CommandInputController::commandHandler(string command) {
                             << timeOnly.substr(timeStart) << ". " << screen->getMemoryViolationAddress()
                             << " invalid." << endl;
                     }
-                    // Step 3: Check if the process is finished normally (MO1 Specification).
-                    //else if (screen->isFinished()) {
-                    //    cout << "Process '" << screenName << "' not found.\n";
-                    //}
-                    // Step 4: If the process exists and is not finished, resume it.
                     else {
                         ScreenManager::getInstance()->switchScreen(screenName);
                         CLIController::getInstance()->clearScreen();
@@ -333,9 +326,6 @@ void CommandInputController::commandHandler(string command) {
             else if (subcommand == "-c") {
                 string processName, memorySizeStr, instructionsStr;
                 ss >> processName >> memorySizeStr;
-
-                // The rest of the line is the instruction string, which might contain spaces.
-                // We need to grab everything inside the quotes.
                 getline(ss, instructionsStr);
                 size_t firstQuote = instructionsStr.find('"');
                 size_t lastQuote = instructionsStr.rfind('"');
@@ -345,7 +335,6 @@ void CommandInputController::commandHandler(string command) {
                     return;
                 }
 
-                // Extract the content between the quotes
                 instructionsStr = instructionsStr.substr(firstQuote + 1, lastQuote - firstQuote - 1);
 
                 try {
@@ -359,10 +348,10 @@ void CommandInputController::commandHandler(string command) {
                         return;
                     }
 
-                    // Call the new parser function
+                    // Call parser function
                     vector<Instruction> userInstructions = parseInstructions(instructionsStr);
 
-                    // Validate instruction count as per requirements
+                    // Validate instruction 
                     if (userInstructions.empty() || userInstructions.size() > 50) {
                         cout << "Invalid command: Instruction count must be between 1 and 50.\n";
                         return;
@@ -479,16 +468,16 @@ void CommandInputController::commandHandler(string command) {
             cout << "Screen list report saved to 'csopesy-log.txt'.\n";
 		}
         else if (command == "process-smi") {
-            ScreenManager::getInstance()->displaySystemSmiSummary(); //TODO
+            ScreenManager::getInstance()->displaySystemSmiSummary();
         }
         else if (command == "vmstat") {
-            ScreenManager::getInstance()->displayVmStat(); //TODO
+            ScreenManager::getInstance()->displayVmStat(); 
         }
         else {
             cout << "Unknown command '" << command << "'. Type 'help' for available commands.\n";
         }
     }
-    else { //if inside a specific process screen
+    else { // if inside a specific process screen
         if (command == "exit") {
             ScreenManager::getInstance()->switchScreen("main");
             CLIController::getInstance()->clearScreen();
@@ -512,6 +501,7 @@ void CommandInputController::commandHandler(string command) {
 
 }
 
+// Starts the main input loop that continuously listens for user commands.
 void CommandInputController::startInputLoop() {
     while (Kernel::getInstance()->getRunningStatus()) {
         handleInputEntry(); // Your existing function already has the logic

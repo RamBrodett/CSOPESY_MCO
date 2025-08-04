@@ -11,19 +11,20 @@
 #include <stack>
 #include "Scheduler.h"
 using namespace std;
-// Corrected Constructor to match header declaration order
 
+// Default constructor for creating placeholder screens (like 'main')
 Screen::Screen()
     : name(""), instructions({}), timestamp(CLIController::getInstance()->getTimestamp()),
     programCounter(0), cpuCoreID(-1), isRunning(false), memoryViolationOccurred(false) {
 }
 
+// Constructor for creating a new process with a name, instructions, and creation timestamp.
 Screen::Screen(string name, std::vector<Instruction> instructions, string timestamp)
     : name(name), instructions(instructions), timestamp(timestamp), programCounter(0),
     cpuCoreID(-1), isRunning(false), memoryViolationOccurred(false) {
 }
 
-// --- Getters (definitions match the corrected header) ---
+// --- Getters ---
 string Screen::getName() const { return name; }
 int Screen::getProgramCounter() const { return programCounter; }
 int Screen::getTotalInstructions() const { return static_cast<int>(instructions.size()); }
@@ -34,6 +35,7 @@ bool Screen::getIsRunning() const { return isRunning; }
 bool Screen::isFinished() const {
     return programCounter >= getTotalInstructions() || hasMemoryViolation();
 }
+
 std::vector<std::string> Screen::getOutputBuffer() const {
     std::lock_guard<std::mutex> lock(outputMutex);
     return outputBuffer;
@@ -46,7 +48,7 @@ std::vector<std::string> Screen::flushOutputBuffer() {
     return flushedOutput;
 }
 
-// --- Setters (definitions match the corrected header) ---
+// --- Setters---
 void Screen::setName(string name) { this->name = name; }
 void Screen::setTimestampFinished(string ts) { timestampFinished = ts; }
 void Screen::setProgramCounter(int pc) { programCounter = pc; }
@@ -65,8 +67,8 @@ void Screen::addOutput(const std::string& message) {
 
 uint16_t Screen::getOperandValue(const Operand& op) {
     if (op.isVariable) {
-        ensureSymbolTableLoaded(); // ADD THIS LINE
-        if (hasMemoryViolation()) return 0; // Check if the access failed
+        ensureSymbolTableLoaded(); 
+        if (hasMemoryViolation()) return 0; 
 
         if (variables.find(op.variableName) == variables.end()) {
             return 0;
@@ -77,8 +79,8 @@ uint16_t Screen::getOperandValue(const Operand& op) {
 }
 
 void Screen::setVariableValue(const std::string& name, uint16_t value) {
-    ensureSymbolTableLoaded(); // ADD THIS LINE
-    if (hasMemoryViolation()) return; // Check if the access failed
+    ensureSymbolTableLoaded(); 
+    if (hasMemoryViolation()) return; 
 
     variables[name] = value;
 }
@@ -95,7 +97,6 @@ void Screen::executeInstructionList(const std::vector<Instruction>& instructionL
         }
 
         switch (instruction.type) {
-            // Note: No 'programCounter++' here, as this is for inner loops
         case InstructionType::DECLARE:
             if (canDeclareVariable()) {
                 setVariableValue(instruction.operands[0].variableName, getOperandValue(instruction.operands[1]));
@@ -153,7 +154,7 @@ void Screen::executeInstructionList(const std::vector<Instruction>& instructionL
         case InstructionType::FOR: {
             uint16_t repeats = getOperandValue(instruction.operands[0]);
             for (uint16_t i = 0; i < repeats; ++i) {
-                // Recursive call to handle nested loops
+               
                 executeInstructionList(instruction.innerInstructions);
             }
             break;
@@ -163,11 +164,12 @@ void Screen::executeInstructionList(const std::vector<Instruction>& instructionL
 }
 
 
+// Executes the process's instructions for a given number of cycles (quantum).
 void Screen::execute(int quantum) {
     if (isFinished()) return;
     setIsRunning(true);
 
-    // Determine how many top-level instructions to run
+    // Determines how many top-level instructions to run
     int instructionsToExecute = (quantum == -1) ? (getTotalInstructions() - programCounter) : quantum;
 
     for (int i = 0; i < instructionsToExecute && !isFinished(); ++i) {
@@ -188,14 +190,13 @@ void Screen::execute(int quantum) {
         case InstructionType::SLEEP:
         case InstructionType::READ:
         case InstructionType::WRITE:
-            //for simple instructions, just execute them using the helper
+            
             executeInstructionList({ instruction });
             break;
 
         case InstructionType::FOR: {
             uint16_t repeats = getOperandValue(instruction.operands[0]);
             for (uint16_t j = 0; j < repeats; ++j) {
-                //call the helper to execute the inner instructions
                 executeInstructionList(instruction.innerInstructions);
             }
             break;
@@ -232,6 +233,7 @@ int Screen::getVariableCount() const {
     return static_cast<int>(variables.size());
 }
 
+// Triggers a memory violation, recording the address and time, and stopping the process.
 void Screen::triggerMemoryViolation(uint16_t address) {
     stringstream ss;
     ss << "0x" << hex << uppercase << address;
@@ -242,15 +244,12 @@ void Screen::triggerMemoryViolation(uint16_t address) {
     setIsRunning(false);
 }
 
-
+// Ensures the page containing the symbol table (address 0x0) is loaded into memory.
 void Screen::ensureSymbolTableLoaded() {
-    if (hasMemoryViolation()) return; // Don't do anything if we already failed
+    if (hasMemoryViolation()) return; 
 
-    uint16_t dummy_value; // We don't care about the value, just the access attempt
+    uint16_t dummy_value; 
     if (!MemoryManager::getInstance()->readMemory(name, 0x0, dummy_value)) {
-        // If the read fails, it means an access violation occurred during the page fault.
-        // The readMemory function itself doesn't cause the violation, but the fault handler might.
-        // We'll trigger our violation handler here to be safe.
         triggerMemoryViolation(0x0);
     }
 }
