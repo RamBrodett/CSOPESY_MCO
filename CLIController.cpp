@@ -74,6 +74,17 @@ void CLIController::drawScreen(const Screen& screen) const {
 	cout << "Process name     : " << screen.getName() << "\n";
 	cout << "Instruction      : " << screen.getProgramCounter() << " / " << screen.getTotalInstructions() << "\n";
 	cout << "Created at       : " << screen.getTimestamp() << "\n";
+
+	if (screen.isFinished() && !screen.hasMemoryViolation()) {
+		cout << "Status           : Finished at " << screen.getTimestampFinished() << "\n";
+	}
+	else if (screen.getIsRunning()) {
+		cout << "Status           : Running on Core " << screen.getCoreID() << "\n";
+	}
+	else {
+		cout << "Status           : Ready in queue\n";
+	}
+
 	cout << COLOR_GREEN << "\n(Type 'exit' to return to main menu)\n" << COLOR_RESET;
 
 }

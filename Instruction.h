@@ -25,9 +25,9 @@ struct Operand {
 };
 //single executable instruction within a process
 struct Instruction {
-    InstructionType type;
+    InstructionType type = InstructionType::PRINT;
     std::vector<Operand> operands;
-    std::string printMessage;
+    std::string printMessage = "";
     std::vector<Instruction> innerInstructions;
-    uint16_t memoryAddress;
+    uint16_t memoryAddress = 0;
 };

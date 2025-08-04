@@ -25,7 +25,7 @@ Screen::Screen(string name, std::vector<Instruction> instructions, string timest
 // --- Getters (definitions match the corrected header) ---
 string Screen::getName() const { return name; }
 int Screen::getProgramCounter() const { return programCounter; }
-int Screen::getTotalInstructions() const { return instructions.size(); }
+int Screen::getTotalInstructions() const { return static_cast<int>(instructions.size()); }
 string Screen::getTimestamp() const { return timestamp; }
 string Screen::getTimestampFinished() const { return timestampFinished; }
 int Screen::getCoreID() const { return cpuCoreID; }
@@ -64,6 +64,9 @@ void Screen::addOutput(const std::string& message) {
 
 uint16_t Screen::getOperandValue(const Operand& op) {
     if (op.isVariable) {
+        ensureSymbolTableLoaded(); // ADD THIS LINE
+        if (hasMemoryViolation()) return 0; // Check if the access failed
+
         if (variables.find(op.variableName) == variables.end()) {
             return 0;
         }
@@ -73,6 +76,9 @@ uint16_t Screen::getOperandValue(const Operand& op) {
 }
 
 void Screen::setVariableValue(const std::string& name, uint16_t value) {
+    ensureSymbolTableLoaded(); // ADD THIS LINE
+    if (hasMemoryViolation()) return; // Check if the access failed
+
     variables[name] = value;
 }
 
@@ -179,6 +185,8 @@ void Screen::execute(int quantum) {
         case InstructionType::SUBTRACT:
         case InstructionType::PRINT:
         case InstructionType::SLEEP:
+        case InstructionType::READ:
+        case InstructionType::WRITE:
             //for simple instructions, just execute them using the helper
             executeInstructionList({ instruction });
             break;
@@ -191,6 +199,7 @@ void Screen::execute(int quantum) {
             }
             break;
         }
+
         }
      
         programCounter++;
@@ -233,3 +242,14 @@ void Screen::triggerMemoryViolation(uint16_t address) {
 }
 
 
+void Screen::ensureSymbolTableLoaded() {
+    if (hasMemoryViolation()) return; // Don't do anything if we already failed
+
+    uint16_t dummy_value; // We don't care about the value, just the access attempt
+    if (!MemoryManager::getInstance()->readMemory(name, 0x0, dummy_value)) {
+        // If the read fails, it means an access violation occurred during the page fault.
+        // The readMemory function itself doesn't cause the violation, but the fault handler might.
+        // We'll trigger our violation handler here to be safe.
+        triggerMemoryViolation(0x0);
+    }
+}

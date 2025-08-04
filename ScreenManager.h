@@ -17,6 +17,8 @@ public:
 
 	std::shared_ptr<Screen> getScreen(const std::string& name);
 	void displayProcessSMI();
+	void displaySystemSmiSummary(); //TODO
+	void displayVmStat();
 
 	// --- Singleton ---
 	static void initialize();

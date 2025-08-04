@@ -82,4 +82,7 @@ private:
     std::unordered_map<std::string, uint16_t> variables; //memory storage for the process's variables
     mutable std::mutex outputMutex; //protect concurrent access to the outputBUffer
     std::vector<std::string> outputBuffer; //buffer to store log messages from PRINT
+
+    void ensureSymbolTableLoaded();
+
 };

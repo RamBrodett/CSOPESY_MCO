@@ -4,6 +4,7 @@
 #include "CLIController.h"
 #include "Scheduler.h"
 #include "Instruction.h"
+#include "MemoryManager.h"
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -57,9 +58,6 @@ void CommandInputController::commandHandler(string command) {
             else {
                 Scheduler::initialize();
                 Kernel::getInstance()->setConfigInitialized(true);
-                //thread([]() {
-                //    Scheduler::getInstance()->start();
-                //}).detach();
                 Scheduler::getInstance()->start();
                 cout << "Initialized successfully.\n";
             }
@@ -76,6 +74,8 @@ void CommandInputController::commandHandler(string command) {
             cout << "scheduler-start     : Start the process scheduler\n";
             cout << "scheduler-stop      : Stop the process scheduler\n";
             cout << "report-util         : Save a report to 'csopesy-log.txt'\n";
+            cout << "process-smi         : Display system and memory summary\n"; //not implemented
+            cout << "vmstat              : Display virtual memory statistics\n"; //not implemented
             cout << "clear               : Clear the screen\n";
             cout << "exit                : Exit program\n";
         }
@@ -93,9 +93,10 @@ void CommandInputController::commandHandler(string command) {
         else if (!Kernel::getInstance()->isConfigInitialized()) {
             cout << "Initialize first" << endl;
             return;
-        } else if (command.rfind("screen", 0) == 0) {
+        }
+        else if (command.rfind("screen", 0) == 0) {
             stringstream ss(command);
-            string token, subcommand, screenName;
+            string token, subcommand, screenName, memorySizeStr;
             ss >> token;      // Consume "screen"
             ss >> subcommand; // Get subcommand
 
@@ -172,22 +173,36 @@ void CommandInputController::commandHandler(string command) {
 
             }
             else if (subcommand == "-s") {
-                ss >> screenName;
-                if (screenName.empty()) {
-                    cout << "Usage: screen -s <name>\n";
-                }
-                else if (ScreenManager::getInstance()->hasScreen(screenName)) {
-                    cout << "Screen '" << screenName << "' already exists.\n";
+                ss >> screenName >> memorySizeStr;
+                if (screenName.empty() || memorySizeStr.empty()) {
+                    cout << "Usage: screen -s <name> <memory_size>\n";
+                    return;
                 }
                 else {
-                    // Use the new method to get randomized instructions
-                    auto newInstructions = Scheduler::getInstance()->generateInstructionsForProcess(screenName);
-                    auto newScreen = make_shared<Screen>(screenName, newInstructions, CLIController::getInstance()->getTimestamp());
-                    ScreenManager::getInstance()->registerScreen(screenName, newScreen);
-                    // Add the new screen to the scheduler's queue
-                    Scheduler::getInstance()->addProcessToQueue(newScreen);
-                    ScreenManager::getInstance()->switchScreen(screenName);
-                    CLIController::getInstance()->clearScreen();
+                    try {
+                        int memSize = stoi(memorySizeStr);
+                        if (memSize < 64 || memSize > 65536) { // Memory validation
+                            cout << "Invalid memory allocation. Size must be between 64 and 65536 bytes.\n";
+                        }
+                        else if (ScreenManager::getInstance()->hasScreen(screenName)) {
+                            cout << "Screen '" << screenName << "' already exists.\n";
+                        }
+                        else {
+                            auto newInstructions = Scheduler::getInstance()->generateInstructionsForProcess(screenName, memSize);
+                            auto newScreen = make_shared<Screen>(screenName, newInstructions, CLIController::getInstance()->getTimestamp());
+
+                            // Setup memory in the MemoryManager first
+                            MemoryManager::getInstance()->setupProcessMemory(screenName, memSize);
+
+                            ScreenManager::getInstance()->registerScreen(screenName, newScreen);
+                            Scheduler::getInstance()->addProcessToQueue(newScreen);
+                            ScreenManager::getInstance()->switchScreen(screenName);
+                            CLIController::getInstance()->clearScreen();
+                        }
+                    }
+                    catch (const std::invalid_argument&) {
+                        cout << "Invalid memory size provided. Please enter a number.\n";
+                    }
                 }
             }
             else if (subcommand == "-r") {
@@ -195,24 +210,33 @@ void CommandInputController::commandHandler(string command) {
                 if (screenName.empty()) {
                     cout << "Usage: screen -r <name>\n";
                 }
+                // Step 1: Check if the screen name exists at all.
                 else if (!ScreenManager::getInstance()->hasScreen(screenName)) {
                     cout << "Process '" << screenName << "' not found.\n";
                 }
                 else {
-					auto screen = ScreenManager::getInstance()->getScreen(screenName);
-					if (screen->isFinished()) {
-                        //check process if finished
-						cout << "Process '" << screenName << "' not found.\n";
-					}
-					else {
-                        //change screen if not finished
+                    auto screen = ScreenManager::getInstance()->getScreen(screenName);
+
+                    // Step 2: Check for a memory violation (MO2 Specification).
+                    if (screen->hasMemoryViolation()) {
+                        string timeOnly = screen->getMemoryViolationTime();
+                        size_t timeStart = timeOnly.find(", ") + 2;
+
+                        cout << "Process " << screen->getName()
+                            << " shut down due to memory access violation error that occurred at "
+                            << timeOnly.substr(timeStart) << ". " << screen->getMemoryViolationAddress()
+                            << " invalid." << endl;
+                    }
+                    // Step 3: Check if the process is finished normally (MO1 Specification).
+                    else if (screen->isFinished()) {
+                        cout << "Process '" << screenName << "' not found.\n";
+                    }
+                    // Step 4: If the process exists and is not finished, resume it.
+                    else {
                         ScreenManager::getInstance()->switchScreen(screenName);
                         CLIController::getInstance()->clearScreen();
-					}
+                    }
                 }
-            }
-            else {
-                cout << "Use proper screen commands.'screen -ls', 'screen -s <name>', or 'screen -r <name>'." << endl;
             }
         }
         else if (command == "scheduler-start") {
@@ -305,6 +329,12 @@ void CommandInputController::commandHandler(string command) {
             logFile.close();
             cout << "Screen list report saved to 'csopesy-log.txt'.\n";
 		}
+        else if (command == "process-smi") {
+            ScreenManager::getInstance()->displaySystemSmiSummary(); //TODO
+        }
+        else if (command == "vmstat") {
+            ScreenManager::getInstance()->displayVmStat(); //TODO
+        }
         else {
             cout << "Unknown command '" << command << "'. Type 'help' for available commands.\n";
         }

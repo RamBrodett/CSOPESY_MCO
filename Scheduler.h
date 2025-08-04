@@ -42,7 +42,6 @@ public:
 	// --- CPU and Core Status ---
 	int getUsedCores() const;
 	int getAvailableCores() const;
-	int getIdleCpuTicks();
 	int getCpuCycles() const;
 	void setCpuCycles(int cpuCycles);
 	int getDelayPerExec() const;
@@ -52,19 +51,22 @@ public:
 	string getAlgorithm() const;
 
 	// --- Memory Config ---
-	int getMemPerProc() const;
+	//int getMemPerProc() const;
 	int getRandomPowerOf2(int minVal, int maxVal);
 
 	void setGeneratingProcesses(bool shouldGenerate);
 	bool getGeneratingProcesses();
 
-	std::vector<Instruction> generateInstructionsForProcess(const std::string& screenName);
+	std::vector<Instruction> generateInstructionsForProcess(const std::string& screenName, int processMemorySize);
 	void startProcessGeneration();
 	void incrementCpuCycles();
 	int getQuantumCycles() const;
+
+	void incrementIdleCpuTicks();
+	int getIdleCpuTicks() const;
+	size_t getProcessQueueSize() const;
+
 private:
-
-
 	// --- Config ---
 	int numCores;
 	int quantumCycles = 1;
@@ -75,14 +77,14 @@ private:
 	int maxOverallMem = 16384;
 	int memPerFrame = 16;
 	int memPerProc = 4096;
-	int minMemPerProc = 64;    
-	int maxMemPerProc = 65536; 
+	int minMemPerProc = 64;
+	int maxMemPerProc = 65536;
 
 	// --- Metrics ---
 	std::atomic<int> coresUsed = 0;
 	int coresAvailable;
 	std::atomic<int> cpuCycles = 0;
-	int idleCpuTicks = 0;
+	// REMOVED: int idleCpuTicks = 0;
 
 	// --- Process Generation ---
 	thread processGeneratorThread;
@@ -94,8 +96,7 @@ private:
 	atomic<bool> schedulerRunning{ false };
 	int activeThreads;
 	vector<thread> workerThreads;
-	queue<shared_ptr<Screen>> processQueue; 
-	mutex processQueueMutex;
+
 	condition_variable processQueueCondition;
 
 	// --- Singleton ---
@@ -105,5 +106,8 @@ private:
 	atomic<bool> generatingProcesses{ false };
 	void generateDummyProcesses();
 
-
+	// --- Correct, Consolidated Declarations ---
+	std::atomic<int> idleCpuTicks{ 0 };
+	std::queue<std::shared_ptr<Screen>> processQueue;
+	mutable std::mutex processQueueMutex;
 };
