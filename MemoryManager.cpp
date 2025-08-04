@@ -27,9 +27,16 @@ void MemoryManager::destroy() {
     instance = nullptr;
 }
 
-MemoryManager::MemoryManager(int totalMemory) : totalMemory(totalMemory) {
-    memoryMap.push_back({ "free", 0, totalMemory });
+//MemoryManager::MemoryManager(int totalMemory) : totalMemory(totalMemory) {
+//    memoryMap.push_back({ "free", 0, totalMemory });
+//}
+MemoryManager::MemoryManager(int totalMemory)
+    : totalMemory(totalMemory), frameSize(256) // example: 256 bytes per frame
+{
+    numFrames = totalMemory / frameSize;
+    frameTable.resize(numFrames);
 }
+
 
 // Allocates a block of memory using the first-fit algorithm(for now).
 bool MemoryManager::allocate(const std::string& processId, int size) {

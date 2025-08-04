@@ -12,6 +12,19 @@ struct MemoryBlock {
     int size;
 };
 
+struct Frame {
+    bool allocated = false;
+    std::string processId;
+    int pageNumber = -1;
+};
+
+struct PageTableEntry {
+    int frameNumber = -1; // -1 if not in memory
+    bool valid = false;
+};
+
+using PageTable = std::vector<PageTableEntry>;
+
 class MemoryManager {
 public:
 
@@ -31,6 +44,8 @@ public:
     bool readMemory(const string& processId, uint16_t address, uint16_t& value);
 	bool writeMemory(const string& processId, uint16_t address, uint16_t value);
     bool isValidMemoryAccess(const string& processId, uint16_t address) const;
+
+    int translateAddress(const std::string& processId, uint16_t logicalAddress);
     
     // --- Paging & Backing Store ---
     void writePageToBackingStore(const std::string& processId, int pageNumber, const std::vector<uint16_t>& pageData);
@@ -48,7 +63,11 @@ private:
     mutable std::mutex mapMutex_;
 
     mutable unordered_map<string, unordered_map<uint16_t, uint16_t>> processMemoryData;
-    
+    std::vector<Frame> frameTable;
+    std::unordered_map<std::string, PageTable> processPageTables;
+    int frameSize; // in bytes
+    int numFrames;
+
     void mergeFreeBlocks();
     pair<int, int> getProcessMemoryBounds(const string& processId) const;
 };
