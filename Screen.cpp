@@ -1,6 +1,7 @@
 #include "Screen.h"
 #include "CLIController.h"
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <iostream>
 #include <thread>
