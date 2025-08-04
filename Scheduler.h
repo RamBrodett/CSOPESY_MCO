@@ -15,21 +15,11 @@ using namespace std;
 class Scheduler {
 public:
 
-	enum STATES {
-		READY,
-		WAITING,
-		RUNNING,
-		FINISHED
-	};
-
-	Scheduler();
-
 	// --- Singleton Access ---
 	static Scheduler* getInstance();
 	static void initialize();
 
 	// --- Process Queue Management ---
-
 	void addProcessToQueue(shared_ptr<Screen> screen);
 
 	// --- Scheduler ---
@@ -51,7 +41,6 @@ public:
 	string getAlgorithm() const;
 
 	// --- Memory Config ---
-	//int getMemPerProc() const;
 	int getRandomPowerOf2(int minVal, int maxVal);
 
 	void setGeneratingProcesses(bool shouldGenerate);
@@ -67,7 +56,9 @@ public:
 	size_t getProcessQueueSize() const;
 
 private:
-	// --- Config ---
+	Scheduler();
+
+	// --- State & Config ---
 	int numCores;
 	int quantumCycles = 1;
 	int batchProcessFreq = 1;
@@ -79,25 +70,19 @@ private:
 	int memPerProc = 4096;
 	int minMemPerProc = 64;
 	int maxMemPerProc = 65536;
+	atomic<bool> schedulerRunning{ false };
 
 	// --- Metrics ---
 	std::atomic<int> coresUsed = 0;
 	int coresAvailable;
 	std::atomic<int> cpuCycles = 0;
-	// REMOVED: int idleCpuTicks = 0;
 
 	// --- Process Generation ---
 	thread processGeneratorThread;
 	int generationIntervalTicks = 5;
 	int lastGenCycle = 0;
 	int generatedProcessCount = 0;
-
-	// --- Scheduler State ---
-	atomic<bool> schedulerRunning{ false };
-	int activeThreads;
-	vector<thread> workerThreads;
-
-	condition_variable processQueueCondition;
+	
 
 	// --- Singleton ---
 	static Scheduler* scheduler;
@@ -106,8 +91,11 @@ private:
 	atomic<bool> generatingProcesses{ false };
 	void generateDummyProcesses();
 
-	// --- Correct, Consolidated Declarations ---
+	// --- Queues & Threads ---
 	std::atomic<int> idleCpuTicks{ 0 };
 	std::queue<std::shared_ptr<Screen>> processQueue;
 	mutable std::mutex processQueueMutex;
+	condition_variable processQueueCondition;
+	int activeThreads;
+	vector<thread> workerThreads;
 };

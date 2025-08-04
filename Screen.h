@@ -9,15 +9,14 @@
 
 class Screen {
 public:
-    enum STATES {
-        READY,
-        WAITING,
-        RUNNING,
-        FINISHED
-    };
-    // -- Contructors --
-    Screen(std::string name, std::vector<Instruction> instructions, std::string timestamp);
+
+    // --- Constructors ---
     Screen();
+    Screen(std::string name, std::vector<Instruction> instructions, std::string timestamp);
+
+    // --- Execution ---
+    void execute(int quantum = -1); // Executes instructions for a quantum, or until completion if -1.
+
 
     // --- Getters ---
     std::string getName() const;
@@ -39,15 +38,14 @@ public:
     void setTimestamp(const std::string& ts);
     void setCoreID(int coreID);
     void setIsRunning(bool running);
-    //if -1, then it is not round robin
-    void execute(int quantum = -1); 
 
-    // Add memory violation tracking
+    // --- Memory Violation Tracking ---
     bool hasMemoryViolation() const;
     std::string getMemoryViolationAddress() const;
     std::string getMemoryViolationTime() const;
-
-    // Symbol table management (64 bytes = 32 variables max)
+    
+    // --- Symbol table management ---
+    // (64 bytes = 32 variables max)
     bool canDeclareVariable() const;
     int getVariableCount() const;
 

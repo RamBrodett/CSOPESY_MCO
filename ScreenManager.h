@@ -1,37 +1,39 @@
 #pragma once
-
 #include "Screen.h"
 #include <memory>
 #include <unordered_map>
 #include <string>
 #include <vector>
 
+using namespace std;
+
 class ScreenManager {
 public:
-	ScreenManager();
-	// --- Screen Management ---
-	void registerScreen(const std::string& name, std::shared_ptr<Screen> screen);
-	void switchScreen(const std::string& name);
-	std::shared_ptr<Screen> getCurrentScreen();
-	bool hasScreen(const std::string& name) const;
-
-	std::shared_ptr<Screen> getScreen(const std::string& name);
-	void displayProcessSMI();
-	void displaySystemSmiSummary(); //TODO
-	void displayVmStat();
-
-	// --- Singleton ---
+	// --- Singleton Access---
 	static void initialize();
 	static ScreenManager* getInstance();
 	static void destroy();
 
-	std::unordered_map<std::string, std::shared_ptr<Screen>> getAllScreens() const;
+	// --- Screen Management ---
+	void registerScreen(const string& name, shared_ptr<Screen> screen);
+	void switchScreen(const string& name);
+	shared_ptr<Screen> getCurrentScreen();
+	bool hasScreen(const string& name) const;
+	shared_ptr<Screen> getScreen(const string& name);
 
+	// --- Display Commands ---
+	void displayProcessSMI();
+	void displaySystemSmiSummary();
+	void displayVmStat();
 
+	std::unordered_map<std::string, shared_ptr<Screen>> getAllScreens() const;
 
 private:
-	static ScreenManager* instance; // single instance of screen manager
-	std::unordered_map<std::string, std::shared_ptr<Screen>> screens;
-	std::unordered_map<std::string, std::vector<std::string>> processLogs;
-	std::shared_ptr<Screen> currentScreen;
+	ScreenManager();
+	static ScreenManager* instance;
+
+	// --- Data Structures ---
+	unordered_map<string, shared_ptr<Screen>> screens;
+	unordered_map<string, vector<std::string>> processLogs;
+	shared_ptr<Screen> currentScreen;
 };
