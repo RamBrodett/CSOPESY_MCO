@@ -31,6 +31,98 @@ CommandInputController* CommandInputController::getInstance() {
     return instance;
 }
 
+
+vector<Instruction> parseInstructions(const string& input);
+
+// Helper to parse a single operand
+Operand parseOperand(const string& token) {
+    if (isalpha(token[0])) { // It's a variable
+        return { true, token, 0 };
+    }
+    else { // It's a literal value
+        return { false, "", static_cast<uint16_t>(stoul(token)) };
+    }
+}
+
+vector<Instruction> parseInstructions(const string& input) {
+    vector<Instruction> instructions;
+    stringstream ss(input);
+    string instructionSegment;
+
+    // Split the main string by semicolons
+    while (getline(ss, instructionSegment, ';')) {
+        instructionSegment.erase(0, instructionSegment.find_first_not_of(" \t\n\r"));
+        if (instructionSegment.empty()) continue;
+
+        stringstream instrStream(instructionSegment);
+        string command;
+        instrStream >> command;
+
+        Instruction newInstruction;
+        string token;
+        vector<string> tokens;
+        while (instrStream >> token) {
+            tokens.push_back(token);
+        }
+
+        if (command == "DECLARE") {
+            if (tokens.size() != 2) throw runtime_error("DECLARE requires 2 arguments.");
+            newInstruction.type = InstructionType::DECLARE;
+            newInstruction.operands.push_back({ true, tokens[0], 0 }); // Variable name
+            newInstruction.operands.push_back(parseOperand(tokens[1])); // Value
+        }
+        else if (command == "ADD" || command == "SUBTRACT") {
+            if (tokens.size() != 3) throw runtime_error(command + " requires 3 arguments.");
+            newInstruction.type = (command == "ADD") ? InstructionType::ADD : InstructionType::SUBTRACT;
+            newInstruction.operands.push_back({ true, tokens[0], 0 }); // Destination variable
+            newInstruction.operands.push_back(parseOperand(tokens[1])); // Operand 1
+            newInstruction.operands.push_back(parseOperand(tokens[2])); // Operand 2
+        }
+        else if (command == "WRITE") {
+            if (tokens.size() != 2) throw runtime_error("WRITE requires 2 arguments.");
+            newInstruction.type = InstructionType::WRITE;
+            newInstruction.memoryAddress = static_cast<uint16_t>(stoul(tokens[0], nullptr, 0)); // Parses hex (0x) or decimal
+            newInstruction.operands.push_back(parseOperand(tokens[1])); // Value to write
+        }
+        else if (command == "READ") {
+            if (tokens.size() != 2) throw runtime_error("READ requires 2 arguments.");
+            newInstruction.type = InstructionType::READ;
+            newInstruction.operands.push_back({ true, tokens[0], 0 }); // Destination variable
+            newInstruction.memoryAddress = static_cast<uint16_t>(stoul(tokens[1], nullptr, 0)); // Parses hex (0x) or decimal
+        }
+        else if (command == "PRINT") {
+            if (tokens.empty()) throw runtime_error("PRINT requires a message.");
+            newInstruction.type = InstructionType::PRINT;
+
+            // ==============================================================================
+            // THE FIX: Reconstruct the message and search for a variable placeholder.
+            // ==============================================================================
+            string message = tokens[0];
+            for (size_t i = 1; i < tokens.size(); ++i) message += " " + tokens[i];
+            newInstruction.printMessage = message;
+
+            // Check if there is a variable to substitute
+            size_t startPos = message.find('%');
+            if (startPos != string::npos) {
+                size_t endPos = message.find('%', startPos + 1);
+                if (endPos != string::npos) {
+                    string varName = message.substr(startPos + 1, endPos - startPos - 1);
+                    // Add the variable as an operand so the executor can find it
+                    newInstruction.operands.push_back({ true, varName, 0 });
+                }
+            }
+        }
+        else {
+            throw runtime_error("Unknown instruction: " + command);
+        }
+        instructions.push_back(newInstruction);
+    }
+    return instructions;
+}
+
+
+
+
 void CommandInputController::handleInputEntry() {
     auto currentScreen = ScreenManager::getInstance()->getCurrentScreen();
 
@@ -228,15 +320,72 @@ void CommandInputController::commandHandler(string command) {
                             << " invalid." << endl;
                     }
                     // Step 3: Check if the process is finished normally (MO1 Specification).
-                    else if (screen->isFinished()) {
-                        cout << "Process '" << screenName << "' not found.\n";
-                    }
+                    //else if (screen->isFinished()) {
+                    //    cout << "Process '" << screenName << "' not found.\n";
+                    //}
                     // Step 4: If the process exists and is not finished, resume it.
                     else {
                         ScreenManager::getInstance()->switchScreen(screenName);
                         CLIController::getInstance()->clearScreen();
                     }
                 }
+            }
+            else if (subcommand == "-c") {
+                string processName, memorySizeStr, instructionsStr;
+                ss >> processName >> memorySizeStr;
+
+                // The rest of the line is the instruction string, which might contain spaces.
+                // We need to grab everything inside the quotes.
+                getline(ss, instructionsStr);
+                size_t firstQuote = instructionsStr.find('"');
+                size_t lastQuote = instructionsStr.rfind('"');
+
+                if (processName.empty() || memorySizeStr.empty() || firstQuote == string::npos || lastQuote == string::npos || firstQuote == lastQuote) {
+                    cout << "Usage: screen -c <name> <memory_size> \"<instructions>\"\n";
+                    return;
+                }
+
+                // Extract the content between the quotes
+                instructionsStr = instructionsStr.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+
+                try {
+                    int memSize = stoi(memorySizeStr);
+                    if (memSize < 64 || memSize > 65536) {
+                        cout << "Invalid memory allocation. Size must be between 64 and 65536 bytes.\n";
+                        return;
+                    }
+                    if (ScreenManager::getInstance()->hasScreen(processName)) {
+                        cout << "Screen '" << processName << "' already exists.\n";
+                        return;
+                    }
+
+                    // Call the new parser function
+                    vector<Instruction> userInstructions = parseInstructions(instructionsStr);
+
+                    // Validate instruction count as per requirements
+                    if (userInstructions.empty() || userInstructions.size() > 50) {
+                        cout << "Invalid command: Instruction count must be between 1 and 50.\n";
+                        return;
+                    }
+
+                    // Create and register the new screen with the parsed instructions
+                    auto newScreen = make_shared<Screen>(processName, userInstructions, CLIController::getInstance()->getTimestamp());
+                    MemoryManager::getInstance()->setupProcessMemory(processName, memSize);
+                    ScreenManager::getInstance()->registerScreen(processName, newScreen);
+                    Scheduler::getInstance()->addProcessToQueue(newScreen);
+
+                    cout << "Process '" << processName << "' created successfully with " << userInstructions.size() << " instructions." << endl;
+
+                }
+                catch (const invalid_argument& e) {
+                    cout << "Invalid memory size provided: " << e.what() << endl;
+                }
+                catch (const runtime_error& e) {
+                    cout << "Error parsing instructions: " << e.what() << endl;
+                }
+            }
+            else {
+				cout << "Unknown screen command '" << subcommand << "\ln";
             }
         }
         else if (command == "scheduler-start") {
@@ -368,3 +517,4 @@ void CommandInputController::startInputLoop() {
         handleInputEntry(); // Your existing function already has the logic
     }
 }
+
