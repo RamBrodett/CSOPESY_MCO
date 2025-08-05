@@ -1,11 +1,10 @@
 #pragma once
-
 #include <string>
 #include <vector>
 #include <cstdint>
 #include <variant>
 
-//defines the types of operations a process can execute
+// Defines the types of operations a process can execute.
 enum class InstructionType {  
     PRINT,  
     DECLARE,  
@@ -13,18 +12,23 @@ enum class InstructionType {
     SUBTRACT,  
     SLEEP,  
     FOR, 
-    ENDFOR 
+    ENDFOR,
+    READ,
+	WRITE
 };
-//operands for an instruction
+
+// Represents an operand for an instruction, which can be a variable or a literal value.
 struct Operand {
     bool isVariable;
     std::string variableName;
     uint16_t value;
 };
-//single executable instruction within a process
+
+// Represents a single executable instruction within a process.
 struct Instruction {
-    InstructionType type;
+    InstructionType type = InstructionType::PRINT;
     std::vector<Operand> operands;
-    std::string printMessage;
+    std::string printMessage = "";
     std::vector<Instruction> innerInstructions;
+    uint16_t memoryAddress = 0;
 };

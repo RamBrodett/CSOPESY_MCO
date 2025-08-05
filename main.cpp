@@ -35,22 +35,18 @@ int main() {
 		if (scheduler && scheduler->getSchedulerRunning()) {
 			scheduler->incrementCpuCycles();
 
-			if (scheduler->getAlgorithm() == "rr") {
-				int currentCycles = scheduler->getCpuCycles();
-				int quantum = scheduler->getQuantumCycles(); 
-				///cout << "DEBUG" << quantum << "+" << currentCycles << endl;
-				if (quantum > 0 && currentCycles > 0 && currentCycles % quantum == 0) {
-					//cout << "DEBUG: Main loop printing memory layout at cycle " << currentCycles << endl;
-					MemoryManager::getInstance()->printMemoryLayout(currentCycles);
-				}
+			// Check for idle state
+			if (scheduler->getProcessQueueSize() == 0) { // You will need to add getProcessQueueSize() to Scheduler
+				scheduler->incrementIdleCpuTicks();
 			}
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(500));
 		}
-
-		// The call to handleInputEntry() is now gone from this loop.
-
-		// Add a small sleep to prevent the simulation from
-		// consuming 100% of a CPU core. , 2 cpu cycles per second
-		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		else {
+			// If the scheduler is not running, we can consider this idle time as well.
+			if (scheduler) scheduler->incrementIdleCpuTicks();
+			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		}
 	}
 
 	//while (Kernel::getInstance()->getRunningStatus()) {

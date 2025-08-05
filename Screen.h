@@ -6,18 +6,18 @@
 #include <mutex>
 #include <memory>
 #include "Instruction.h"
+#include <map>
 
 class Screen {
 public:
-    enum STATES {
-        READY,
-        WAITING,
-        RUNNING,
-        FINISHED
-    };
-    // -- Contructors --
-    Screen(std::string name, std::vector<Instruction> instructions, std::string timestamp);
+
+    // --- Constructors ---
     Screen();
+    Screen(std::string name, std::vector<Instruction> instructions, std::string timestamp);
+
+    // --- Execution ---
+    void execute(int quantum = -1); // Executes instructions for a quantum, or until completion if -1.
+
 
     // --- Getters ---
     std::string getName() const;
@@ -39,8 +39,17 @@ public:
     void setTimestamp(const std::string& ts);
     void setCoreID(int coreID);
     void setIsRunning(bool running);
-    //if -1, then it is not round robin
-    void execute(int quantum = -1); 
+
+    // --- Memory Violation Tracking ---
+    bool hasMemoryViolation() const;
+    std::string getMemoryViolationAddress() const;
+    std::string getMemoryViolationTime() const;
+    
+    // --- Symbol table management ---
+    // (64 bytes = 32 variables max)
+    bool canDeclareVariable() const;
+    int getVariableCount() const;
+
 
 private:
     // Helper methods
@@ -48,6 +57,17 @@ private:
     void setVariableValue(const std::string& name, uint16_t value);
     void addOutput(const std::string& message);
     void executeInstructionList(const std::vector<Instruction>& instructionList);
+
+    // Memory violation tracking
+    bool memoryViolationOccurred;
+    std::string memoryViolationAddress;
+    std::string memoryViolationTime;
+
+    // Symbol table limit (32 variables max)
+    static const int MAX_VARIABLES = 32;
+
+    // Helper method for handling violations
+    void triggerMemoryViolation(uint16_t address);
 
     // --- Member variables ---
     std::string name;
@@ -59,7 +79,14 @@ private:
     std::string timestampFinished;
     bool isRunning; 
 
-    std::unordered_map<std::string, uint16_t> variables; //memory storage for the process's variables
+    //std::unordered_map<std::string, uint16_t> variables; //memory storage for the process's variables
     mutable std::mutex outputMutex; //protect concurrent access to the outputBUffer
     std::vector<std::string> outputBuffer; //buffer to store log messages from PRINT
+
+    void ensureSymbolTableLoaded();
+
+    // Maps a variable name to its memory address (offset) within the symbol table.
+    std::map<std::string, uint16_t> variable_offsets;
+    // Keeps track of the next available memory slot in the symbol table.
+    uint16_t next_variable_offset;
 };
