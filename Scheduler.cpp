@@ -156,6 +156,7 @@ std::vector<Instruction> Scheduler::generateInstructionsForProcess(const std::st
     static std::mt19937 gen(rd());
     static std::uniform_int_distribution<> instr_dist(minInstructions, maxInstructions);
     static std::uniform_int_distribution<> value_dist(1, 100);
+
     // --- Lambda to generate a single random instruction (excluding FOR) ---
     auto generateRandomInstruction = [&](const string& screenName) -> Instruction {
         uniform_int_distribution<> type_dist(0, 5);
@@ -191,54 +192,45 @@ std::vector<Instruction> Scheduler::generateInstructionsForProcess(const std::st
         default: // Fallback to PRINT if anything unexpected happens
             return { InstructionType::PRINT, {{true, "x", 0}}, "Value from " + screenName + ": %x%!" };
         }
-    };
-    // Lambda to generate a FOR loop with nested instructions (max 3 levels) 
-    function<void(int, vector<Instruction>&, int&, int)> generateForInstruction;
-    generateForInstruction = [&](int nestLevel, vector<Instruction>& instructions, int& currentCount, int maxCount) {
-        if (currentCount >= maxCount || nestLevel > 3) return;
-
-        if (currentCount + 2 > maxCount) return;
-
-        int repeats = value_dist(gen) % 4 + 2; // 2-5 repeats
-        int innerCount = value_dist(gen) % 3 + 2; // 2-4 inner instructions
-        vector<Instruction> innerInstructions;
-        int tempInstructionCount = 0;
-
-        for (int j = 0; j < innerCount && (currentCount + tempInstructionCount < maxCount); ++j) {
-            if (nestLevel < 3 && value_dist(gen) % 4 == 0) {
-                generateForInstruction(nestLevel + 1, innerInstructions, tempInstructionCount, innerCount);
-            }
-            else {
-                innerInstructions.push_back(generateRandomInstruction("FOR"));
-                tempInstructionCount++;
-            }
-        }
-
-        if (!innerInstructions.empty()) {
-            Instruction forInstr = { InstructionType::FOR, {{false, "", (uint16_t)repeats}}, "", innerInstructions };
-            instructions.push_back(forInstr);
-            currentCount += tempInstructionCount + 1;
-        }
         };
 
-    // --- Main logic to generate the full set of instructions ---
+    // --- CORRECTED MAIN LOGIC ---
     vector<Instruction> instructions;
-    int num_instructions = instr_dist(gen);
-    int currentCount = 0;
-    instructions.push_back({ InstructionType::DECLARE, {{true, "x", 0}, {false, "", (uint16_t)value_dist(gen)}}, "" });
-    currentCount++;
+    int target_instruction_count = instr_dist(gen);
 
-    for (int i = 0; i < num_instructions && currentCount < maxInstructions; ++i) {
-        if (i > 0 && value_dist(gen) % 5 == 0) {
-            generateForInstruction(1, instructions, currentCount, maxInstructions);
-        }
-        else {
-            if (currentCount < maxInstructions) {
+    // Add the initial DECLARE instruction. This counts as the first instruction.
+    instructions.push_back({ InstructionType::DECLARE, {{true, "x", 0}, {false, "", (uint16_t)value_dist(gen)}}, "" });
+
+    // Loop until the vector of instructions reaches the target size.
+    while (instructions.size() < target_instruction_count) {
+        // Decide whether to generate a FOR loop (20% chance after the first instruction).
+        bool createForLoop = (instructions.size() > 1 && value_dist(gen) % 5 == 0);
+
+        if (createForLoop) {
+            // This simplified logic replaces the complex recursive lambda.
+            int repeats = value_dist(gen) % 4 + 2;      // 2-5 repeats
+            int innerCount = value_dist(gen) % 3 + 2;   // 2-4 inner instructions
+            vector<Instruction> innerInstructions;
+
+            for (int j = 0; j < innerCount; ++j) {
+                // Generate simple instructions inside the FOR loop.
+                innerInstructions.push_back(generateRandomInstruction("FOR"));
+            }
+
+            if (!innerInstructions.empty()) {
+                instructions.push_back({ InstructionType::FOR, {{false, "", (uint16_t)repeats}}, "", innerInstructions });
+            }
+            else {
+                // Fallback in case inner instructions list is empty for some reason.
                 instructions.push_back(generateRandomInstruction(screenName));
-                currentCount++;
             }
         }
+        else {
+            // Add a regular, simple instruction.
+            instructions.push_back(generateRandomInstruction(screenName));
+        }
     }
+
     return instructions;
 }
 

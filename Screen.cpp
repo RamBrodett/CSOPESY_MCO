@@ -169,10 +169,14 @@ void Screen::execute(int quantum) {
     if (isFinished()) return;
     setIsRunning(true);
 
-    // Determines how many top-level instructions to run
+    // Determines how many top-level instructions to run based on the quantum.
     int instructionsToExecute = (quantum == -1) ? (getTotalInstructions() - programCounter) : quantum;
 
     for (int i = 0; i < instructionsToExecute && !isFinished(); ++i) {
+        // Ensure the program counter is within the bounds of the instructions vector.
+        if (programCounter >= instructions.size()) {
+            break;
+        }
         const auto& instruction = instructions[programCounter];
 
         // --- Busy-wait delay ---
@@ -181,29 +185,12 @@ void Screen::execute(int quantum) {
             for (volatile int d = 0; d < delay; ++d) { /* busy-wait */ }
         }
 
-        switch (instruction.type) {
+        // --- CORRECTED LOGIC ---
+        // Delegate the execution of the current instruction to the helper function.
+        // This removes the large, duplicated switch statement from this driver function.
+        executeInstructionList({ instruction });
 
-        case InstructionType::DECLARE:
-        case InstructionType::ADD:
-        case InstructionType::SUBTRACT:
-        case InstructionType::PRINT:
-        case InstructionType::SLEEP:
-        case InstructionType::READ:
-        case InstructionType::WRITE:
-            
-            executeInstructionList({ instruction });
-            break;
-
-        case InstructionType::FOR: {
-            uint16_t repeats = getOperandValue(instruction.operands[0]);
-            for (uint16_t j = 0; j < repeats; ++j) {
-                executeInstructionList(instruction.innerInstructions);
-            }
-            break;
-        }
-
-        }
-     
+        // Advance the program counter to the next top-level instruction.
         programCounter++;
     }
 
@@ -211,7 +198,7 @@ void Screen::execute(int quantum) {
         setTimestampFinished(CLIController::getInstance()->getTimestamp());
         setIsRunning(false);
     }
-};
+}
 
 bool Screen::hasMemoryViolation() const {
     return memoryViolationOccurred;

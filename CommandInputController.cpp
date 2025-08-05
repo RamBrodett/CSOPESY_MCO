@@ -48,6 +48,92 @@ Operand parseOperand(const string& token) {
 }
 
 // Parses a string of semicolon-separated user commands into a vector of Instruction structs.
+//vector<Instruction> parseInstructions(const string& input) {
+//    vector<Instruction> instructions;
+//    stringstream ss(input);
+//    string instructionSegment;
+//
+//    // Split the input string by semicolons to process each instruction.
+//    while (getline(ss, instructionSegment, ';')) {
+//        instructionSegment.erase(0, instructionSegment.find_first_not_of(" \t\n\r"));
+//        if (instructionSegment.empty()) continue;
+//
+//        stringstream instrStream(instructionSegment);
+//        string command;
+//        instrStream >> command;
+//
+//        Instruction newInstruction;
+//        string token;
+//        vector<string> tokens;
+//
+//        // Parsing logic for DECLARE, ADD, WRITE, READ, PRINT etc.
+//        while (instrStream >> token) {
+//            tokens.push_back(token);
+//        }
+//
+//        if (command == "DECLARE") {
+//            if (tokens.size() != 2) throw runtime_error("DECLARE requires 2 arguments.");
+//            newInstruction.type = InstructionType::DECLARE;
+//            newInstruction.operands.push_back({ true, tokens[0], 0 }); // Variable name
+//            newInstruction.operands.push_back(parseOperand(tokens[1])); // Value
+//        }
+//        else if (command == "ADD" || command == "SUBTRACT") {
+//            if (tokens.size() != 3) throw runtime_error(command + " requires 3 arguments.");
+//            newInstruction.type = (command == "ADD") ? InstructionType::ADD : InstructionType::SUBTRACT;
+//            newInstruction.operands.push_back({ true, tokens[0], 0 }); // Destination variable
+//            newInstruction.operands.push_back(parseOperand(tokens[1])); // Operand 1
+//            newInstruction.operands.push_back(parseOperand(tokens[2])); // Operand 2
+//        }
+//        else if (command == "WRITE") {
+//            if (tokens.size() != 2) throw runtime_error("WRITE requires 2 arguments.");
+//            newInstruction.type = InstructionType::WRITE;
+//            newInstruction.memoryAddress = static_cast<uint16_t>(stoul(tokens[0], nullptr, 0)); // Parses hex (0x) or decimal
+//            newInstruction.operands.push_back(parseOperand(tokens[1])); // Value to write
+//        }
+//        else if (command == "READ") {
+//            if (tokens.size() != 2) throw runtime_error("READ requires 2 arguments.");
+//            newInstruction.type = InstructionType::READ;
+//            newInstruction.operands.push_back({ true, tokens[0], 0 }); // Destination variable
+//            newInstruction.memoryAddress = static_cast<uint16_t>(stoul(tokens[1], nullptr, 0)); // Parses hex (0x) or decimal
+//        }
+//        else if (command == "PRINT") {
+//            if (tokens.empty()) throw runtime_error("PRINT requires a message.");
+//            newInstruction.type = InstructionType::PRINT;
+//
+//            string message = tokens[0];
+//            for (size_t i = 1; i < tokens.size(); ++i) message += " " + tokens[i];
+//            newInstruction.printMessage = message;
+//
+//            // Check if there is a variable to substitute
+//            size_t startPos = message.find('%');
+//            if (startPos != string::npos) {
+//                size_t endPos = message.find('%', startPos + 1);
+//                if (endPos != string::npos) {
+//                    string varName = message.substr(startPos + 1, endPos - startPos - 1);
+//                    // Add the variable as an operand so the executor can find it
+//                    newInstruction.operands.push_back({ true, varName, 0 });
+//                }
+//            }
+//        }
+//        else {
+//            throw runtime_error("Unknown instruction: " + command);
+//        }
+//        instructions.push_back(newInstruction);
+//    }
+//    return instructions;
+//}
+//
+
+std::string trim(const std::string& str) {
+    const std::string whitespace = " \t\n\r";
+    const auto strBegin = str.find_first_not_of(whitespace);
+    if (strBegin == std::string::npos)
+        return ""; // no content
+    const auto strEnd = str.find_last_not_of(whitespace);
+    const auto strRange = strEnd - strBegin + 1;
+    return str.substr(strBegin, strRange);
+}
+
 vector<Instruction> parseInstructions(const string& input) {
     vector<Instruction> instructions;
     stringstream ss(input);
@@ -55,75 +141,107 @@ vector<Instruction> parseInstructions(const string& input) {
 
     // Split the input string by semicolons to process each instruction.
     while (getline(ss, instructionSegment, ';')) {
-        instructionSegment.erase(0, instructionSegment.find_first_not_of(" \t\n\r"));
-        if (instructionSegment.empty()) continue;
-
-        stringstream instrStream(instructionSegment);
-        string command;
-        instrStream >> command;
+        string trimmedSegment = trim(instructionSegment);
+        if (trimmedSegment.empty()) continue;
 
         Instruction newInstruction;
-        string token;
-        vector<string> tokens;
 
-        // Parsing logic for DECLARE, ADD, WRITE, READ, PRINT etc.
-        while (instrStream >> token) {
-            tokens.push_back(token);
-        }
-
-        if (command == "DECLARE") {
-            if (tokens.size() != 2) throw runtime_error("DECLARE requires 2 arguments.");
-            newInstruction.type = InstructionType::DECLARE;
-            newInstruction.operands.push_back({ true, tokens[0], 0 }); // Variable name
-            newInstruction.operands.push_back(parseOperand(tokens[1])); // Value
-        }
-        else if (command == "ADD" || command == "SUBTRACT") {
-            if (tokens.size() != 3) throw runtime_error(command + " requires 3 arguments.");
-            newInstruction.type = (command == "ADD") ? InstructionType::ADD : InstructionType::SUBTRACT;
-            newInstruction.operands.push_back({ true, tokens[0], 0 }); // Destination variable
-            newInstruction.operands.push_back(parseOperand(tokens[1])); // Operand 1
-            newInstruction.operands.push_back(parseOperand(tokens[2])); // Operand 2
-        }
-        else if (command == "WRITE") {
-            if (tokens.size() != 2) throw runtime_error("WRITE requires 2 arguments.");
-            newInstruction.type = InstructionType::WRITE;
-            newInstruction.memoryAddress = static_cast<uint16_t>(stoul(tokens[0], nullptr, 0)); // Parses hex (0x) or decimal
-            newInstruction.operands.push_back(parseOperand(tokens[1])); // Value to write
-        }
-        else if (command == "READ") {
-            if (tokens.size() != 2) throw runtime_error("READ requires 2 arguments.");
-            newInstruction.type = InstructionType::READ;
-            newInstruction.operands.push_back({ true, tokens[0], 0 }); // Destination variable
-            newInstruction.memoryAddress = static_cast<uint16_t>(stoul(tokens[1], nullptr, 0)); // Parses hex (0x) or decimal
-        }
-        else if (command == "PRINT") {
-            if (tokens.empty()) throw runtime_error("PRINT requires a message.");
+        // Manually check if the instruction is PRINT to avoid stringstream errors.
+        if (trimmedSegment.rfind("PRINT", 0) == 0) {
             newInstruction.type = InstructionType::PRINT;
 
-            string message = tokens[0];
-            for (size_t i = 1; i < tokens.size(); ++i) message += " " + tokens[i];
-            newInstruction.printMessage = message;
+            // Extract the arguments part of the string
+            string args = trimmedSegment.substr(string("PRINT").length());
+            string trimmedArgs = trim(args);
 
-            // Check if there is a variable to substitute
-            size_t startPos = message.find('%');
-            if (startPos != string::npos) {
-                size_t endPos = message.find('%', startPos + 1);
-                if (endPos != string::npos) {
-                    string varName = message.substr(startPos + 1, endPos - startPos - 1);
-                    // Add the variable as an operand so the executor can find it
-                    newInstruction.operands.push_back({ true, varName, 0 });
-                }
+            // Validate and remove the outer parentheses
+            if (trimmedArgs.length() < 2 || trimmedArgs.front() != '(' || trimmedArgs.back() != ')') {
+                throw runtime_error("PRINT arguments must be enclosed in parentheses, e.g., PRINT(\"message\" + var).");
             }
+            string innerArgs = trimmedArgs.substr(1, trimmedArgs.size() - 2);
+
+            // --- REVISED AND FINAL PARSING LOGIC ---
+            // Find the string literal first, as it's a more reliable anchor.
+            size_t firstQuote = innerArgs.find('"');
+            size_t lastQuote = innerArgs.rfind('"');
+
+            if (firstQuote == std::string::npos || lastQuote == firstQuote) {
+                throw std::runtime_error("PRINT statement must contain a string literal enclosed in double quotes.");
+            }
+
+            string stringLiteral = innerArgs.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+
+            // Find the '+' operator to locate the variable.
+            size_t plusPos = innerArgs.find('+');
+            if (plusPos == std::string::npos) {
+                throw std::runtime_error("PRINT statement requires a '+' to concatenate string and variable.");
+            }
+
+            // Determine if the variable is before or after the string literal based on the '+' position.
+            string variableName;
+            if (plusPos > lastQuote) { // Case: "message" + var
+                variableName = trim(innerArgs.substr(plusPos + 1));
+                newInstruction.printMessage = stringLiteral + "%" + variableName + "%";
+            }
+            else { // Case: var + "message"
+                variableName = trim(innerArgs.substr(0, plusPos));
+                newInstruction.printMessage = "%" + variableName + "%" + stringLiteral;
+            }
+
+            if (variableName.empty()) {
+                throw runtime_error("Variable name in PRINT statement cannot be empty.");
+            }
+
+            // The operand is always the variable to be substituted.
+            newInstruction.operands.push_back({ true, variableName, 0 });
+
         }
         else {
-            throw runtime_error("Unknown instruction: " + command);
+            // --- Fallback to the original logic for all other commands ---
+            stringstream instrStream(trimmedSegment);
+            string command;
+            instrStream >> command;
+
+            string token;
+            vector<string> tokens;
+            while (instrStream >> token) {
+                tokens.push_back(token);
+            }
+
+            if (command == "DECLARE") {
+                if (tokens.size() != 2) throw runtime_error("DECLARE requires 2 arguments.");
+                newInstruction.type = InstructionType::DECLARE;
+                newInstruction.operands.push_back({ true, tokens[0], 0 });
+                newInstruction.operands.push_back(parseOperand(tokens[1]));
+            }
+            else if (command == "ADD" || command == "SUBTRACT") {
+                if (tokens.size() != 3) throw runtime_error(command + " requires 3 arguments.");
+                newInstruction.type = (command == "ADD") ? InstructionType::ADD : InstructionType::SUBTRACT;
+                newInstruction.operands.push_back({ true, tokens[0], 0 });
+                newInstruction.operands.push_back(parseOperand(tokens[1]));
+                newInstruction.operands.push_back(parseOperand(tokens[2]));
+            }
+            else if (command == "WRITE") {
+                if (tokens.size() != 2) throw runtime_error("WRITE requires 2 arguments.");
+                newInstruction.type = InstructionType::WRITE;
+                newInstruction.memoryAddress = static_cast<uint16_t>(stoul(tokens[0], nullptr, 0));
+                newInstruction.operands.push_back(parseOperand(tokens[1]));
+            }
+            else if (command == "READ") {
+                if (tokens.size() != 2) throw runtime_error("READ requires 2 arguments.");
+                newInstruction.type = InstructionType::READ;
+                newInstruction.operands.push_back({ true, tokens[0], 0 });
+                newInstruction.memoryAddress = static_cast<uint16_t>(stoul(tokens[1], nullptr, 0));
+            }
+            else {
+                throw runtime_error("Unknown instruction: " + command);
+            }
         }
+
         instructions.push_back(newInstruction);
     }
     return instructions;
 }
-
-
 
 // Prompts the user, reads a line of input, and passes it to the command handler.
 void CommandInputController::handleInputEntry() {
