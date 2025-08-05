@@ -34,7 +34,7 @@ int main() {
 			scheduler->incrementCpuCycles();
 
 			// Check for idle state
-			if (scheduler->getProcessQueueSize() == 0) { // You will need to add getProcessQueueSize() to Scheduler
+			if (scheduler->getProcessQueueSize() == 0) { 
 				scheduler->incrementIdleCpuTicks();
 			}
 

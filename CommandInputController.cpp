@@ -47,82 +47,6 @@ Operand parseOperand(const string& token) {
     }
 }
 
-// Parses a string of semicolon-separated user commands into a vector of Instruction structs.
-//vector<Instruction> parseInstructions(const string& input) {
-//    vector<Instruction> instructions;
-//    stringstream ss(input);
-//    string instructionSegment;
-//
-//    // Split the input string by semicolons to process each instruction.
-//    while (getline(ss, instructionSegment, ';')) {
-//        instructionSegment.erase(0, instructionSegment.find_first_not_of(" \t\n\r"));
-//        if (instructionSegment.empty()) continue;
-//
-//        stringstream instrStream(instructionSegment);
-//        string command;
-//        instrStream >> command;
-//
-//        Instruction newInstruction;
-//        string token;
-//        vector<string> tokens;
-//
-//        // Parsing logic for DECLARE, ADD, WRITE, READ, PRINT etc.
-//        while (instrStream >> token) {
-//            tokens.push_back(token);
-//        }
-//
-//        if (command == "DECLARE") {
-//            if (tokens.size() != 2) throw runtime_error("DECLARE requires 2 arguments.");
-//            newInstruction.type = InstructionType::DECLARE;
-//            newInstruction.operands.push_back({ true, tokens[0], 0 }); // Variable name
-//            newInstruction.operands.push_back(parseOperand(tokens[1])); // Value
-//        }
-//        else if (command == "ADD" || command == "SUBTRACT") {
-//            if (tokens.size() != 3) throw runtime_error(command + " requires 3 arguments.");
-//            newInstruction.type = (command == "ADD") ? InstructionType::ADD : InstructionType::SUBTRACT;
-//            newInstruction.operands.push_back({ true, tokens[0], 0 }); // Destination variable
-//            newInstruction.operands.push_back(parseOperand(tokens[1])); // Operand 1
-//            newInstruction.operands.push_back(parseOperand(tokens[2])); // Operand 2
-//        }
-//        else if (command == "WRITE") {
-//            if (tokens.size() != 2) throw runtime_error("WRITE requires 2 arguments.");
-//            newInstruction.type = InstructionType::WRITE;
-//            newInstruction.memoryAddress = static_cast<uint16_t>(stoul(tokens[0], nullptr, 0)); // Parses hex (0x) or decimal
-//            newInstruction.operands.push_back(parseOperand(tokens[1])); // Value to write
-//        }
-//        else if (command == "READ") {
-//            if (tokens.size() != 2) throw runtime_error("READ requires 2 arguments.");
-//            newInstruction.type = InstructionType::READ;
-//            newInstruction.operands.push_back({ true, tokens[0], 0 }); // Destination variable
-//            newInstruction.memoryAddress = static_cast<uint16_t>(stoul(tokens[1], nullptr, 0)); // Parses hex (0x) or decimal
-//        }
-//        else if (command == "PRINT") {
-//            if (tokens.empty()) throw runtime_error("PRINT requires a message.");
-//            newInstruction.type = InstructionType::PRINT;
-//
-//            string message = tokens[0];
-//            for (size_t i = 1; i < tokens.size(); ++i) message += " " + tokens[i];
-//            newInstruction.printMessage = message;
-//
-//            // Check if there is a variable to substitute
-//            size_t startPos = message.find('%');
-//            if (startPos != string::npos) {
-//                size_t endPos = message.find('%', startPos + 1);
-//                if (endPos != string::npos) {
-//                    string varName = message.substr(startPos + 1, endPos - startPos - 1);
-//                    // Add the variable as an operand so the executor can find it
-//                    newInstruction.operands.push_back({ true, varName, 0 });
-//                }
-//            }
-//        }
-//        else {
-//            throw runtime_error("Unknown instruction: " + command);
-//        }
-//        instructions.push_back(newInstruction);
-//    }
-//    return instructions;
-//}
-//
 
 // Helper function (can be placed in CommandInputController.cpp)
 bool isPowerOfTwo(int n) {
@@ -296,8 +220,8 @@ void CommandInputController::commandHandler(string command) {
             cout << "scheduler-start     : Start the process scheduler\n";
             cout << "scheduler-stop      : Stop the process scheduler\n";
             cout << "report-util         : Save a report to 'csopesy-log.txt'\n";
-            cout << "process-smi         : Display system and memory summary\n"; //not implemented
-            cout << "vmstat              : Display virtual memory statistics\n"; //not implemented
+            cout << "process-smi         : Display system and memory summary\n"; 
+            cout << "vmstat              : Display virtual memory statistics\n"; 
             cout << "clear               : Clear the screen\n";
             cout << "exit                : Exit program\n";
         }
