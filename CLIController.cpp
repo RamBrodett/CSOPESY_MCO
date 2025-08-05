@@ -11,7 +11,7 @@
 
 using namespace std;
 
-// --- Singleton ---
+// Singleton
 CLIController* CLIController::instance = nullptr;
 // Constructor (private for singleton pattern).
 CLIController::CLIController() {};

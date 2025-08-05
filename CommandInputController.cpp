@@ -18,7 +18,7 @@
 #include <functional>
 using namespace std;
 
-// --- Singleton ---
+// Singleton
 CommandInputController* CommandInputController::instance = nullptr;
 
 // Constructor (private for singleton pattern).

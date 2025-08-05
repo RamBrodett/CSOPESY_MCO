@@ -15,32 +15,32 @@ using namespace std;
 class Scheduler {
 public:
 
-	// --- Singleton Access ---
+	// Singleton Access
 	static Scheduler* getInstance();
 	static void initialize();
 
-	// --- Process Queue Management ---
+	// Process Queue Management
 	void addProcessToQueue(shared_ptr<Screen> screen);
 
-	// --- Scheduler ---
+	// Scheduler
 	void start();
 	void stop();
 	void loadConfig();
 	bool getSchedulerRunning() const;
 	void setSchedulerRunning(bool val);
 
-	// --- CPU and Core Status ---
+	// CPU and Core Status
 	int getUsedCores() const;
 	int getAvailableCores() const;
 	int getCpuCycles() const;
 	void setCpuCycles(int cpuCycles);
 	int getDelayPerExec() const;
 
-	// --- Algorithm Configuration ---
+	// Algorithm Configuration
 	void setAlgorithm(const string& algo);
 	string getAlgorithm() const;
 
-	// --- Memory Config ---
+	// Memory Config
 	int getRandomPowerOf2(int minVal, int maxVal);
 
 	void setGeneratingProcesses(bool shouldGenerate);
@@ -58,7 +58,7 @@ public:
 private:
 	Scheduler();
 
-	// --- State & Config ---
+	// State & Config
 	int numCores;
 	int quantumCycles = 1;
 	int batchProcessFreq = 1;

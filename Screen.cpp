@@ -62,9 +62,6 @@ std::string Screen::getMemoryViolationTime() const {
 void Screen::setCoreID(int id) { cpuCoreID = id; }
 void Screen::setIsRunning(bool running) { isRunning = running; }
 
-
-// Core Logic
-
 // Executes the process's instructions for a given number of cycles (quantum).
 void Screen::execute(int quantum) {
     if (isFinished()) return;
@@ -94,7 +91,6 @@ void Screen::execute(int quantum) {
         setIsRunning(false);
     }
 }
-
 
 // Private Helper Methods
 
