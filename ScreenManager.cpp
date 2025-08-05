@@ -160,18 +160,18 @@ void ScreenManager::displayVmStat() {
 
     // Display formatted output
     cout << "--------------------- VM STATS ---------------------" << endl;
-    cout << " memory" << endl;
-    cout << left << setw(25) << " total:" << totalMem << " B" << endl;
-    cout << left << setw(25) << " used:" << usedMem << " B" << endl;
-    cout << left << setw(25) << " free:" << freeMem << " B" << endl;
+    cout << " Memory" << endl;
+    cout << left << setw(25) << " Total:" << totalMem << " B" << endl;
+    cout << left << setw(25) << " Used:" << usedMem << " B" << endl;
+    cout << left << setw(25) << " Free:" << freeMem << " B" << endl;
     cout << "----------------------------------------------------" << endl;
-    cout << " cpu ticks" << endl;
-    cout << left << setw(25) << " total:" << totalTicks << endl;
-    cout << left << setw(25) << " active:" << activeTicks << endl;
-    cout << left << setw(25) << " idle:" << idleTicks << endl;
+    cout << " Cpu Ticks" << endl;
+    cout << left << setw(25) << " Total:" << totalTicks << endl;
+    cout << left << setw(25) << " Active:" << activeTicks << endl;
+    cout << left << setw(25) << " Idle:" << idleTicks << endl;
     cout << "----------------------------------------------------" << endl;
-    cout << " paging" << endl;
-    cout << left << setw(25) << " paged in:" << pagedIn << endl;
-    cout << left << setw(25) << " paged out:" << pagedOut << endl;
+    cout << " Paging" << endl;
+    cout << left << setw(25) << " Paged in:" << pagedIn << endl;
+    cout << left << setw(25) << " Paged out:" << pagedOut << endl;
     cout << "----------------------------------------------------" << endl;
 }
