@@ -10,7 +10,7 @@
 
 using namespace std;
 
-// --- Singleton ---
+// Singleton
 ScreenManager* ScreenManager::instance = nullptr;
 // Constructor (private for singleton pattern).
 ScreenManager::ScreenManager() {}
@@ -158,7 +158,7 @@ void ScreenManager::displayVmStat() {
     int idleTicks = scheduler->getIdleCpuTicks(); 
     int activeTicks = totalTicks - idleTicks;
 
-    // --- Display formatted output ---
+    // Display formatted output
     cout << "--------------------- VM STATS ---------------------" << endl;
     cout << " memory" << endl;
     cout << left << setw(25) << " total:" << totalMem << " B" << endl;

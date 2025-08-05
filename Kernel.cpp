@@ -1,7 +1,7 @@
 #include "Kernel.h"
 using namespace std;
 
-// --- Singleton ---
+// Singleton
 Kernel* Kernel::instance = nullptr;
 
 // Constructor (private for singleton pattern).

@@ -11,15 +11,15 @@
 class Screen {
 public:
 
-    // --- Constructors ---
+    // Constructors
     Screen();
     Screen(std::string name, std::vector<Instruction> instructions, std::string timestamp);
 
-    // --- Execution ---
+    // Execution
     void execute(int quantum = -1); // Executes instructions for a quantum, or until completion if -1.
 
 
-    // --- Getters ---
+    // Getters
     std::string getName() const;
     int getProgramCounter() const;
     int getTotalInstructions() const; //casted from size_t to int
@@ -31,7 +31,7 @@ public:
     bool isFinished() const;
     std::vector<std::string> getOutputBuffer() const;
 
-    // --- Setters ---
+    // Setters
     void setName(std::string name);
     void setTimestampFinished(std::string timestampFinished);
     void setProgramCounter(int pc);
@@ -40,12 +40,12 @@ public:
     void setCoreID(int coreID);
     void setIsRunning(bool running);
 
-    // --- Memory Violation Tracking ---
+    // Memory Violation Tracking
     bool hasMemoryViolation() const;
     std::string getMemoryViolationAddress() const;
     std::string getMemoryViolationTime() const;
     
-    // --- Symbol table management ---
+    // Symbol table management
     // (64 bytes = 32 variables max)
     bool canDeclareVariable() const;
     int getVariableCount() const;
@@ -69,17 +69,16 @@ private:
     // Helper method for handling violations
     void triggerMemoryViolation(uint16_t address);
 
-    // --- Member variables ---
+    // Member variables
     std::string name;
     std::vector<Instruction> instructions;
     std::string timestamp;
 
-    int programCounter; //index of instruction
+    int programCounter; // Index of instruction
     int cpuCoreID;
     std::string timestampFinished;
     bool isRunning; 
 
-    //std::unordered_map<std::string, uint16_t> variables; //memory storage for the process's variables
     mutable std::mutex outputMutex; //protect concurrent access to the outputBUffer
     std::vector<std::string> outputBuffer; //buffer to store log messages from PRINT
 

@@ -72,26 +72,26 @@ private:
 	int maxMemPerProc = 65536;
 	atomic<bool> schedulerRunning{ false };
 
-	// --- Metrics ---
+	// Metrics
 	std::atomic<int> coresUsed = 0;
 	int coresAvailable;
 	std::atomic<int> cpuCycles = 0;
 
-	// --- Process Generation ---
+	// Process Generation
 	thread processGeneratorThread;
 	int generationIntervalTicks = 5;
 	int lastGenCycle = 0;
 	int generatedProcessCount = 0;
 	
 
-	// --- Singleton ---
+	// Singleton
 	static Scheduler* scheduler;
 	string algorithm = "";
 	static mutex scheduler_init_mutex;
 	atomic<bool> generatingProcesses{ false };
 	void generateDummyProcesses();
 
-	// --- Queues & Threads ---
+	// Queues & Threads
 	std::atomic<int> idleCpuTicks{ 0 };
 	std::queue<std::shared_ptr<Screen>> processQueue;
 	mutable std::mutex processQueueMutex;

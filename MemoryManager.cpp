@@ -7,7 +7,7 @@
 #include <numeric>
 using namespace std;
 
-// --- Singleton & Mutex ---
+// Singleton & Mutex
 MemoryManager* MemoryManager::instance = nullptr;
 mutex MemoryManager::mutex_;
 
@@ -159,17 +159,6 @@ int MemoryManager::findVictimFrame() {
     next_victim_frame = (next_victim_frame + 1) % numFrames;
     return victim;
 }
-
-/*/ Writes the content of a frame to the backing store file.
-void MemoryManager::writePageToBackingStore(int frameNumber) {
-    fstream file("csopesy-backing-store.txt", ios::in | ios::out | ios::binary);
-    if (!file) {
-        file.open("csopesy-backing-store.txt", ios::out | ios::binary);
-    }
-    file.seekp(frameNumber * frameSize, ios::beg);
-    int physical_address = (frameNumber * frameSize) / sizeof(uint16_t);
-    file.write(reinterpret_cast<const char*>(&physical_memory[physical_address]), frameSize);
-}*/
 
 // Helper function to calculate a unique file offset for a page
 long long MemoryManager::getBackingStoreOffset(const std::string& processId, int pageNumber) const {

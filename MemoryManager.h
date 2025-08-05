@@ -26,21 +26,21 @@ using PageTable = std::vector<PageTableEntry>;
 class MemoryManager {
 public:
 
-    // --- Singleton Access ---
+    // Singleton Access
     static void initialize(int totalMemory, int frameSize); // added 
     static MemoryManager* getInstance();
     static void destroy();
 
-    // --- Memory Operations ---
+    // Memory Operations
     bool setupProcessMemory(const std::string& processId, int size);
     void deallocate(const std::string& processId);
 
 
-    // --- Memory Access ---
+    // Memory Access
     bool readMemory(const string& processId, uint16_t address, uint16_t& value);
 	bool writeMemory(const string& processId, uint16_t address, uint16_t value);
     
-    // --- Statistics ---
+    // Statistics
     int getTotalMemory() const;
     int getUsedMemory() const;
     int getProcessMemoryUsage(const std::string& processId) const;
@@ -53,13 +53,13 @@ private:
     MemoryManager(int totalMemory, int frameSize);
 
     long long getBackingStoreOffset(const std::string& processId, int pageNumber) const;
-    // --- Page Fault and Backing Store Logic (Private) ---
+    // Page Fault and Backing Store Logic
     int handlePageFault(const std::string& processId, int pageNumber);
     int findVictimFrame();
     void writePageToBackingStore(int frameNumber);
     void readPageFromBackingStore(const std::string& processId, int pageNumber, int frameNumber);
 
-    // --- Data Structures ---
+    // Data Structures
     int totalMemory;
     int frameSize;
     int numFrames;
@@ -69,15 +69,11 @@ private:
     std::unordered_map<std::string, PageTable> process_page_tables;
     std::vector<uint16_t> physical_memory; 
 
-    // --- Statistics Counter ---
+    // Statistics Counter
     std::atomic<int> pages_paged_in{ 0 };
     std::atomic<int> pages_paged_out{ 0 };
 
     mutable std::mutex memory_mutex_;
     static MemoryManager* instance;
     static std::mutex mutex_;
-
 };
-
-
-

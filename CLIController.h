@@ -6,19 +6,19 @@
 class CLIController {
 public:
 
-	/// --- Singleton Access ---
+	// Singleton Access
 	static void initialize();
 	static CLIController* getInstance();
 	static void destroy();
 
-	/// --- Screen Output ---
+	// Screen Output
 	std::string getTimestamp() const;
 	void printHeader() const;
 	void drawScreen(const Screen& screen) const;
 	void clearScreen() const;
 
 
-	// --- ANSI Color Constants ---
+	// ANSI Color Constants
 	static const std::string COLOR_GREEN;
 	static const std::string COLOR_RED;
 	static const std::string COLOR_BLUE;

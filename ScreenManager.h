@@ -9,19 +9,19 @@ using namespace std;
 
 class ScreenManager {
 public:
-	// --- Singleton Access---
+	// Singleton Access
 	static void initialize();
 	static ScreenManager* getInstance();
 	static void destroy();
 
-	// --- Screen Management ---
+	// Screen Management
 	void registerScreen(const string& name, shared_ptr<Screen> screen);
 	void switchScreen(const string& name);
 	shared_ptr<Screen> getCurrentScreen();
 	bool hasScreen(const string& name) const;
 	shared_ptr<Screen> getScreen(const string& name);
 
-	// --- Display Commands ---
+	// Display Commands
 	void displayProcessSMI();
 	void displaySystemSmiSummary();
 	void displayVmStat();
@@ -32,7 +32,7 @@ private:
 	ScreenManager();
 	static ScreenManager* instance;
 
-	// --- Data Structures ---
+	// Data Structures
 	unordered_map<string, shared_ptr<Screen>> screens;
 	unordered_map<string, vector<std::string>> processLogs;
 	shared_ptr<Screen> currentScreen;

@@ -4,17 +4,17 @@ using namespace std;
 
 class Kernel {
 public:
-    // --- Singleton Access ---
+    // Singleton Access
     static void initialize();
     static Kernel* getInstance();
     static void destroy(); 
 
-    // --- Application State Management ---
+    // Application State Management
     bool getRunningStatus() const;
     void setRunningStatus(bool newStatus);
     thread& getSchedulerThread();
 
-    // --- Configuration State ---
+    // Configuration State
     void setConfigInitialized(bool status);
     bool isConfigInitialized() const;
 

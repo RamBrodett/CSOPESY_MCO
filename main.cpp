@@ -24,12 +24,10 @@ int main() {
 	ScreenManager::getInstance()->switchScreen("main");
 	CLIController::getInstance()->clearScreen();
 
-
-	// --- LAUNCH INPUT THREAD ---
 	// Launch a separate thread to handle user commands.
 	std::thread inputThread(&CommandInputController::startInputLoop, CommandInputController::getInstance());
 
-	// --- MAIN SIMULATION LOOP ---
+	// Main simulation loop
 	while (Kernel::getInstance()->getRunningStatus()) {
 		auto scheduler = Scheduler::getInstance();
 		if (scheduler && scheduler->getSchedulerRunning()) {
@@ -48,24 +46,6 @@ int main() {
 			std::this_thread::sleep_for(std::chrono::milliseconds(500));
 		}
 	}
-
-	//while (Kernel::getInstance()->getRunningStatus()) {
-	//	auto scheduler = Scheduler::getInstance();
-	//	if (scheduler && scheduler->getSchedulerRunning()) {
-	//		// Increment the cycle on every loop
-	//		scheduler->incrementCpuCycles();
-
-	//		// Check for memory reporting on every cycle tick
-	//		if (scheduler->getAlgorithm() == "rr") {
-
-	//		}
-	//	}
-
-
-	//	CommandInputController::getInstance()->handleInputEntry();
-	//	//Add a small sleep to prevent the loop from consuming 100% CPU
-	//	//std::this_thread::sleep_for(std::chrono::milliseconds(100));
-	//}
 
 	cout << "Main loop exited. Waiting for input thread to join..." << endl;
 	// Wait for the input handling thread to finish its execution.

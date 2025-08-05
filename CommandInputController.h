@@ -5,12 +5,12 @@
 
 class CommandInputController {
 public:
-	// --- Singleton Access ---
+	// Singleton Access
 	static void initialize();
 	static CommandInputController* getInstance();
 	static void destroy();
 
-	// --- Input Loop ---
+	// Input Loop
 	void startInputLoop();
 
 private:

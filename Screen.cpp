@@ -10,7 +10,7 @@
 #include <mutex>
 #include <chrono>
 
-// --- Constructors ---
+// Constructors
 
 // Default constructor for creating placeholder screens (like 'main')
 Screen::Screen()
@@ -25,7 +25,7 @@ Screen::Screen(std::string name, std::vector<Instruction> instructions, std::str
 }
 
 
-// --- Getters ---
+// Getters
 
 std::string Screen::getName() const { return name; }
 int Screen::getProgramCounter() const { return programCounter; }
@@ -57,13 +57,13 @@ std::string Screen::getMemoryViolationTime() const {
     return memoryViolationTime;
 }
 
-// --- Setters---
+// Setters
 
 void Screen::setCoreID(int id) { cpuCoreID = id; }
 void Screen::setIsRunning(bool running) { isRunning = running; }
 
 
-// --- Core Logic ---
+// Core Logic
 
 // Executes the process's instructions for a given number of cycles (quantum).
 void Screen::execute(int quantum) {
@@ -96,7 +96,7 @@ void Screen::execute(int quantum) {
 }
 
 
-// --- Private Helper Methods ---
+// Private Helper Methods
 
 void Screen::addOutput(const std::string& message) {
     std::lock_guard<std::mutex> lock(outputMutex);
@@ -195,7 +195,7 @@ void Screen::executeInstructionList(const std::vector<Instruction>& instructionL
             uint16_t address = instruction.memoryAddress;
             uint16_t value;
             if (MemoryManager::getInstance()->readMemory(name, address, value)) {
-                // CORRECTED: Check if we can declare a new variable OR if it already exists in the correct map.
+                // Check if we can declare a new variable OR if it already exists in the correct map.
                 if (canDeclareVariable() || variable_offsets.count(instruction.operands[0].variableName)) {
                     setVariableValue(instruction.operands[0].variableName, value);
                 }

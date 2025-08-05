@@ -15,11 +15,11 @@
 
 using namespace std;
 
-// --- Singleton & Mutex ---
+// Singleton & Mutex
 Scheduler* Scheduler::scheduler = nullptr;
 std::mutex Scheduler::scheduler_init_mutex;
 
-// Constructor: initializes scheduler state variables.
+// Initializes scheduler state variables.
 Scheduler::Scheduler()
     : numCores(0), coresUsed(0), coresAvailable(0),
     schedulerRunning(false), activeThreads(0) {
@@ -45,7 +45,7 @@ Scheduler* Scheduler::getInstance() {
 void Scheduler::setAlgorithm(const string& algo) { algorithm = algo; }
 string Scheduler::getAlgorithm() const { return algorithm; }
 
-// Adds a process (screen) to the ready queue to be executed.
+// Adds a process to the ready queue to be executed.
 void Scheduler::addProcessToQueue(shared_ptr<Screen> screen) {
     lock_guard<mutex> lock(processQueueMutex);
     processQueue.push(screen);
@@ -79,7 +79,6 @@ void Scheduler::start() {
                     this->processQueue.pop();
                 }
 
-                // --- CORRECTED LOGIC ---
                 if (process) {
                     // If the process has already finished (e.g., memory violation),
                     // just deallocate its resources and continue.
@@ -156,13 +155,13 @@ void Scheduler::stop() {
 
 // Generates a set of random instructions for a new process.
 std::vector<Instruction> Scheduler::generateInstructionsForProcess(const std::string& screenName, int processMemorySize) {
-    // --- Random number generators ---
+    // Random number generators
     static std::random_device rd;
     static std::mt19937 gen(rd());
     static std::uniform_int_distribution<> instr_dist(minInstructions, maxInstructions);
     static std::uniform_int_distribution<> value_dist(1, 100);
 
-    // --- Lambda to generate a single random instruction (excluding FOR) ---
+    // Lambda to generate a single random instruction (excluding FOR)
     auto generateRandomInstruction = [&](const string& screenName) -> Instruction {
         uniform_int_distribution<> type_dist(0, 5);
         InstructionType type = static_cast<InstructionType>(type_dist(gen));
@@ -199,7 +198,6 @@ std::vector<Instruction> Scheduler::generateInstructionsForProcess(const std::st
         }
         };
 
-    // --- CORRECTED MAIN LOGIC ---
     vector<Instruction> instructions;
     int target_instruction_count = instr_dist(gen);
 
@@ -266,7 +264,7 @@ void Scheduler::generateDummyProcesses() {
 // Loads and parses configuration parameters from the "config.txt" file.
 void Scheduler::loadConfig() {
     ifstream config("config.txt");
-    //error checker
+    // Error checker
     if (!config) {
         cerr << "Error: config.txt not found. Using default values." << endl;
         numCores = 2;
@@ -277,10 +275,10 @@ void Scheduler::loadConfig() {
         maxInstructions = 100;
         delayPerExec = 1;
         coresAvailable = numCores;
-		maxOverallMem = 16384; //default 16MB
-		memPerFrame = 16; //default 16KB
-        minMemPerProc = 64;    // default 64 bytes
-        maxMemPerProc = 65536; // default 65536 bytes (64 KB)
+		maxOverallMem = 16384; // Default 16MB
+		memPerFrame = 16; // Default 16KB
+        minMemPerProc = 64;    // Default 64 bytes
+        maxMemPerProc = 65536; // Default 65536 bytes (64 KB)
         return;
     }
 
@@ -301,7 +299,7 @@ void Scheduler::loadConfig() {
                 algorithm = value;
             }
             else {
-                algorithm = "fcfs"; //default value
+                algorithm = "fcfs"; // Default value
             }
         }
         else if (key == "quantum-cycles") {
@@ -345,7 +343,7 @@ void Scheduler::loadConfig() {
             if (maxMemPerProc > 65536) maxMemPerProc = 65536;
         }
     }
-    //assign cores available
+    // Assign cores available
     coresAvailable = numCores;
 }
 
