@@ -437,7 +437,6 @@ void CommandInputController::commandHandler(string command) {
                 }
                 else {
                     auto screen = ScreenManager::getInstance()->getScreen(screenName);
-
                     // Check for a memory violation.
                     if (screen->hasMemoryViolation()) {
                         string timeOnly = screen->getMemoryViolationTime();
@@ -447,6 +446,10 @@ void CommandInputController::commandHandler(string command) {
                             << " shut down due to memory access violation error that occurred at "
                             << timeOnly.substr(timeStart) << ". " << screen->getMemoryViolationAddress()
                             << " invalid." << endl;
+                    }
+                    else if(screen->isFinished()) {
+                        //check process if finished
+                        cout << "Process '" << screenName << "' not found.\n";
                     }
                     else {
                         ScreenManager::getInstance()->switchScreen(screenName);
