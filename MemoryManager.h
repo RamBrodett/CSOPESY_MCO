@@ -52,6 +52,7 @@ public:
 private:
     MemoryManager(int totalMemory, int frameSize);
 
+    long long getBackingStoreOffset(const std::string& processId, int pageNumber) const;
     // --- Page Fault and Backing Store Logic (Private) ---
     int handlePageFault(const std::string& processId, int pageNumber);
     int findVictimFrame();

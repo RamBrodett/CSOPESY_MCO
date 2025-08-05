@@ -71,7 +71,6 @@ void Scheduler::start() {
                     this->processQueueCondition.wait(lock, [this]() {
                         return !this->processQueue.empty() || !this->schedulerRunning;
                         });
-                  
 
                     if (!this->schedulerRunning) return;
                     if (this->processQueue.empty()) continue;
@@ -80,8 +79,15 @@ void Scheduler::start() {
                     this->processQueue.pop();
                 }
 
+                // --- CORRECTED LOGIC ---
                 if (process) {
-                    
+                    // If the process has already finished (e.g., memory violation),
+                    // just deallocate its resources and continue.
+                    if (process->isFinished()) {
+                        MemoryManager::getInstance()->deallocate(process->getName());
+                        continue; // Skip to the next process
+                    }
+
                     coresUsed++;
                     process->setCoreID(i);
 
@@ -90,18 +96,17 @@ void Scheduler::start() {
 
                     coresUsed--;
 
-                    // If process is finished, deallocate its memory. Otherwise, requeue it.
+                    // If process is finished now, deallocate its memory. Otherwise, requeue it.
                     if (process->isFinished()) {
-                        // If finished, free its memory.
                         MemoryManager::getInstance()->deallocate(process->getName());
                     }
                     else {
-                        // If not finished (must be RR), put it back in the queue for its next turn.
+                        // If not finished (must be RR), put it back in the queue.
                         addProcessToQueue(process);
                     }
                 }
             }
-        });
+            });
     }
 }
 

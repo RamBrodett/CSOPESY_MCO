@@ -113,7 +113,7 @@ void ScreenManager::displaySystemSmiSummary() {
     cout << "PROCESS-SMI V1.00 Driver Version: 0.001" << endl;
     cout << "========================================================" << endl;
     cout << "CPU Utilization: " << usedCores << " / " << availableCores << " Cores" << endl;
-    cout << "Memory Usage: " << usedMem / 1024 << "KB / " << totalMem / 1024 << "KB" << endl;
+    cout << "Memory Usage: " << usedMem << "B / " << totalMem << "B" << endl;
     cout << "Memory Util: " << fixed << setprecision(2) << memUtilization << "%" << endl;
     cout << "--------------------------------------------------------" << endl;
     cout << "Running processes and memory usage:" << endl;

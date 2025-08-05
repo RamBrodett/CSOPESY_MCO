@@ -171,65 +171,60 @@ void MemoryManager::writePageToBackingStore(int frameNumber) {
     file.write(reinterpret_cast<const char*>(&physical_memory[physical_address]), frameSize);
 }*/
 
-// Writes the content of a frame to the backing store file.
-void MemoryManager::writePageToBackingStore(int frameNumber) {
-    // Get the logical page info from the frame table
-    const auto& frameInfo = frame_table[frameNumber];
-    if (frameInfo.processId.empty()) return; // Should not happen if called correctly
+// Helper function to calculate a unique file offset for a page
+long long MemoryManager::getBackingStoreOffset(const std::string& processId, int pageNumber) const {
+    long long pageSlot = 0;
+    bool processFound = false;
 
-    // Calculate a unique, persistent location in the backing store
-    int pageSlot = 0;
+    // This loop calculates a unique, stable position for the page in the file.
     for (const auto& pair : process_page_tables) {
-        if (pair.first == frameInfo.processId) {
-            pageSlot += frameInfo.pageNumber;
-            break;
+        if (pair.first == processId) {
+            pageSlot += pageNumber;
+            processFound = true;
+            break; // Stop after finding the process
         }
-        pageSlot += pair.second.size();
+        pageSlot += pair.second.size(); // Add the total number of pages for the preceding process
     }
-    long long fileOffset = static_cast<long long>(pageSlot) * frameSize;
 
+    if (!processFound) {
+        // This case should ideally not be hit if the function is called correctly
+        return -1;
+    }
 
+    return pageSlot * frameSize;
+}
+
+// Corrected function to write a page to its unique location
+void MemoryManager::writePageToBackingStore(int frameNumber) {
+    const auto& frameInfo = frame_table[frameNumber];
+    if (frameInfo.processId.empty()) return;
+
+    long long fileOffset = getBackingStoreOffset(frameInfo.processId, frameInfo.pageNumber);
+    if (fileOffset == -1) return; // Process not found, cannot write
+
+    // Use fstream for robust read/write operations
     fstream file("csopesy-backing-store.txt", ios::in | ios::out | ios::binary);
     if (!file) {
+        // If the file doesn't exist, create it
         file.open("csopesy-backing-store.txt", ios::out | ios::binary);
+        file.close();
+        file.open("csopesy-backing-store.txt", ios::in | ios::out | ios::binary);
     }
+
     file.seekp(fileOffset, ios::beg);
     int physical_address = (frameNumber * frameSize) / sizeof(uint16_t);
     file.write(reinterpret_cast<const char*>(&physical_memory[physical_address]), frameSize);
 }
 
-
-/*/ Reads a page for a process from the backing store into a specified frame.
+// Corrected function to read a page from its unique location
 void MemoryManager::readPageFromBackingStore(const std::string& processId, int pageNumber, int frameNumber) {
-    fstream file("csopesy-backing-store.txt", ios::in | ios::binary);
-    int physical_address = (frameNumber * frameSize) / sizeof(uint16_t);
-
-    if (file) {
-        file.seekg(frameNumber * frameSize, ios::beg);
-        file.read(reinterpret_cast<char*>(&physical_memory[physical_address]), frameSize);
-        if (file.gcount() < frameSize) {
-            // If read fails or is incomplete, zero out the memory
-            fill(physical_memory.begin() + physical_address, physical_memory.begin() + physical_address + (frameSize / sizeof(uint16_t)), 0);
-        }
-    }
-    else {
-        // If file doesn't exist, the page is new; zero it out
+    long long fileOffset = getBackingStoreOffset(processId, pageNumber);
+    if (fileOffset == -1) {
+        // If we can't determine an offset, we must zero out the memory to prevent data corruption.
+        int physical_address = (frameNumber * frameSize) / sizeof(uint16_t);
         fill(physical_memory.begin() + physical_address, physical_memory.begin() + physical_address + (frameSize / sizeof(uint16_t)), 0);
+        return;
     }
-}*/
-
-// Reads a page for a process from the backing store into a specified frame.
-void MemoryManager::readPageFromBackingStore(const std::string& processId, int pageNumber, int frameNumber) {
-    // Calculate the unique, persistent location in the backing store
-    int pageSlot = 0;
-    for (const auto& pair : process_page_tables) {
-        if (pair.first == processId) {
-            pageSlot += pageNumber;
-            break;
-        }
-        pageSlot += pair.second.size();
-    }
-    long long fileOffset = static_cast<long long>(pageSlot) * frameSize;
 
     fstream file("csopesy-backing-store.txt", ios::in | ios::binary);
     int physical_address = (frameNumber * frameSize) / sizeof(uint16_t);
@@ -237,17 +232,17 @@ void MemoryManager::readPageFromBackingStore(const std::string& processId, int p
     if (file) {
         file.seekg(fileOffset, ios::beg);
         file.read(reinterpret_cast<char*>(&physical_memory[physical_address]), frameSize);
+        // If the read was short (gcount() < frameSize), it means we read past the end
+        // of the file, which implies this page was never written out. So, we zero it.
         if (file.gcount() < frameSize) {
-            // If read fails or is incomplete, zero out the memory
             fill(physical_memory.begin() + physical_address, physical_memory.begin() + physical_address + (frameSize / sizeof(uint16_t)), 0);
         }
     }
     else {
-        // If file doesn't exist, the page is new; zero it out
+        // If the file doesn't exist at all, the page is new; zero it out.
         fill(physical_memory.begin() + physical_address, physical_memory.begin() + physical_address + (frameSize / sizeof(uint16_t)), 0);
     }
 }
-
 
 // Returns the total configured memory of the system.
 int MemoryManager::getTotalMemory() const {

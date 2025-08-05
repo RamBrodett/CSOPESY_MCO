@@ -124,6 +124,13 @@ Operand parseOperand(const string& token) {
 //}
 //
 
+// Helper function (can be placed in CommandInputController.cpp)
+bool isPowerOfTwo(int n) {
+    return (n > 0) && ((n & (n - 1)) == 0);
+}
+
+
+
 std::string trim(const std::string& str) {
     const std::string whitespace = " \t\n\r";
     const auto strBegin = str.find_first_not_of(whitespace);
@@ -389,6 +396,12 @@ void CommandInputController::commandHandler(string command) {
                 else {
                     try {
                         int memSize = stoi(memorySizeStr);
+
+                        if (!isPowerOfTwo(memSize)) {
+                            cout << "Invalid memory allocation. Size must be a power of 2.\n";
+                            return;
+                        }
+                        
                         if (memSize < 64 || memSize > 65536) { // Memory validation
                             cout << "Invalid memory allocation. Size must be between 64 and 65536 bytes.\n";
                         }
@@ -457,6 +470,10 @@ void CommandInputController::commandHandler(string command) {
 
                 try {
                     int memSize = stoi(memorySizeStr);
+                    if (!isPowerOfTwo(memSize)) {
+                        cout << "Invalid memory allocation. Size must be a power of 2.\n";
+                        return;
+                    }
                     if (memSize < 64 || memSize > 65536) {
                         cout << "Invalid memory allocation. Size must be between 64 and 65536 bytes.\n";
                         return;
@@ -492,7 +509,7 @@ void CommandInputController::commandHandler(string command) {
                 }
             }
             else {
-				cout << "Unknown screen command '" << subcommand << "\ln";
+				cout << "Unknown screen command '" << subcommand << " \n";
             }
         }
         else if (command == "scheduler-start") {

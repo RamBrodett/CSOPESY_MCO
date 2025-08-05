@@ -6,6 +6,7 @@
 #include <mutex>
 #include <memory>
 #include "Instruction.h"
+#include <map>
 
 class Screen {
 public:
@@ -49,6 +50,7 @@ public:
     bool canDeclareVariable() const;
     int getVariableCount() const;
 
+
 private:
     // Helper methods
     uint16_t getOperandValue(const Operand& op);
@@ -77,10 +79,14 @@ private:
     std::string timestampFinished;
     bool isRunning; 
 
-    std::unordered_map<std::string, uint16_t> variables; //memory storage for the process's variables
+    //std::unordered_map<std::string, uint16_t> variables; //memory storage for the process's variables
     mutable std::mutex outputMutex; //protect concurrent access to the outputBUffer
     std::vector<std::string> outputBuffer; //buffer to store log messages from PRINT
 
     void ensureSymbolTableLoaded();
 
+    // Maps a variable name to its memory address (offset) within the symbol table.
+    std::map<std::string, uint16_t> variable_offsets;
+    // Keeps track of the next available memory slot in the symbol table.
+    uint16_t next_variable_offset;
 };
